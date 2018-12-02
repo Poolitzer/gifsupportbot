@@ -13,73 +13,18 @@
             "Send all the words!!!!",
             "Freedom!",
             "What keyword?"
-        ],
-        [
-            "TDWAKTOP",
-            "ludwig",
-            "lala"
-        ],
-        [
-            "Pool",
-            "Linus",
-            "hihi"
         ]
     ],
     "links": [
         [
-            "Titel",
+            "TestTitel1",
             "huuiiiii",
             2345
         ],
         [
-            "Titel123",
-            "How to do better test",
-            "1234mmm"
-        ],
-        [
-            "BetterTest",
-            "How to do better test",
-            2345
-        ],
-        [
-            "BetterTest",
-            "How to do better test",
-            2345
-        ],
-        [
-            "BetterTest",
-            "How to do better test",
-            2345
-        ],
-        [
-            "BetterTest",
-            "How to do better test",
-            2345
-        ],
-        [
-            "BetterTest",
-            "How to do better test",
-            2345
-        ],
-        [
-            "BetterTest",
-            "How to do better test",
-            2345
-        ],
-        [
-            "BetterTest",
-            "How to do better test",
-            2345
-        ],
-        [
-            "BetterTest",
-            "How to do better test",
-            2345
-        ],
-        [
-            "frrr",
-            "Good",
-            2345
+            "TestTitel2",
+            "Lets do this",
+            1234
         ]
     ]
 }
