@@ -1,2 +1,6 @@
 # Bot token etc
 tokens.py
+
+# virtual environment stuff
+venv
+.idea
