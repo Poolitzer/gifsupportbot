@@ -4,3 +4,4 @@ tokens.py
 # virtual environment stuff
 venv
 .idea
+*.pyc
