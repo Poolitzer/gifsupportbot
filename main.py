@@ -1,6 +1,6 @@
 from tokens import BOTTOKEN, ADMINS
 from uuid import uuid4
-from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup
+from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, ParseMode
 from telegram.ext import CommandHandler, Updater, Filters, ConversationHandler, InlineQueryHandler, \
     CallbackQueryHandler, MessageHandler
 from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
@@ -14,19 +14,20 @@ logging.basicConfig(filename="log.log", format='%(asctime)s - %(first_name)s - %
 data_base = open('./database.json')
 database = json.load(data_base)
 
-ENTRY, CHANGEWHAT, UPDATE, CHANGE = range(4)
+ENTRY, CHANGEWHAT, UPDATE, CHANGE, TITEL, DESCRIPTION, KEYWORDS = range(7)
 
 
 class Variables:
     variable = []
+    add = []
 
 
 Globalvariables = Variables()
 
 
 def text_creator(index):
-    text = "Have a look at this gif to well, fuck. {}".format(database["links"][index][2])
-    return InputTextMessageContent(text)
+    text = "Have a look <a href=\"https://t.me/gifsupport/{}\">at this gif</a> :)".format(database["links"][index][2])
+    return InputTextMessageContent(text, ParseMode.HTML)
 
 
 def start(_, update):
@@ -64,7 +65,8 @@ def update_db(_, update):
     subtemp = []
     x = 0
     for index, names in enumerate(database["links"]):
-        subtemp.append(InlineKeyboardButton(names[0], callback_data="update{}".format(str(len(str(index)))+str(index))))
+        subtemp.append(
+            InlineKeyboardButton(names[0], callback_data="update{}".format(str(len(str(index))) + str(index))))
         x += 1
         if x is 2:
             temp.append(subtemp)
@@ -223,6 +225,65 @@ def pass_update(_, update):
     return ConversationHandler.END
 
 
+def add_db(_, update):
+    if update.message.forward_from_chat.id == -1001353729458:
+        skip = False
+        for post in database["links"]:
+            if post[2] == update.message.forward_from_message_id:
+                skip = True
+                update.message.reply_text("Haha, funny. Please forward me a new post from the botsupport channel smh")
+                return ConversationHandler.END
+        if not skip:
+            Globalvariables.add = [0, 0, update.message.forward_from_message_id]
+            update.message.reply_text("Great, a new GIF. Please send its titel :) Use /cancel anytime to cancel.")
+            return TITEL
+    else:
+        update.message.reply_text("Haha, funny. Please forward me an animation from the botsupport channel smh")
+        return ConversationHandler.END
+
+
+def add_titel(_, update):
+    Globalvariables.add[0] = update.message.text
+    update.message.reply_text("<b>{}</b> it is. Please send me a good description now"
+                              .format(update.message.text), parse_mode=ParseMode.HTML)
+    return DESCRIPTION
+
+
+def add_description(_, update):
+    Globalvariables.add[1] = update.message.text
+    database["links"].append(Globalvariables.add)
+    Globalvariables.add = []
+    update.message.reply_text("The description is <b>{}</b>. Lets head over to keywords, send me one."
+                              .format(update.message.text), parse_mode=ParseMode.HTML)
+    return KEYWORDS
+
+
+def add_keyword(_, update):
+    messages = ["No one will see this. Sad story. Welp, there we go",
+                "You added the keyword <b>{}</b>. If you want to add another one, send it. If you are finished, send "
+                "/finish.", "Heyy. A second keyword. It's <b>{}</b>, right?",
+                "A third? Well, thats cool. <b>{}</b> this time.", "A fourth? :OOO <b>{}</b>. Don't forget /finish...",
+                "ANOTHER ONE? You are kidding me, right? It's <b>{}</b>, neat", "I really like <b>{}</b>.",
+                "Don't push it too far though, not even with <b>{}</b>.", "Ok. Its enough. <b>{}</b>.",
+                "Please. Stop. <b>{}</b>", "I'm really not creative anymore. <b>{}</b>"]
+    Globalvariables.add.append(update.message.text)
+    try:
+        update.message.reply_text(messages[len(Globalvariables.add)].format(update.message.text),
+                                  parse_mode=ParseMode.HTML)
+    except IndexError:
+        update.message.reply_text(messages[-1].format(update.message.text), parse_mode=ParseMode.HTML)
+    return KEYWORDS
+
+
+def finish(_, update):
+    database["keywords"].append(Globalvariables.add)
+    Globalvariables.add = []
+    with open('./database.json', 'w') as outfile:
+        json.dump(database, outfile, indent=4, sort_keys=True)
+    update.message.reply_text("SUCCESS. Thanks for adding a post. Have a good one".format(update.message.text))
+    return ConversationHandler.END
+
+
 def cancel(_, update):
     update.message.reply_text('Mission ABORTED!')
     return ConversationHandler.END
@@ -245,8 +306,18 @@ def main():
 
         fallbacks=[CommandHandler('cancel', cancel)],
 
-                                              )
+    )
     dp.add_handler(conv_update_handler)
+    conv_add_handler = ConversationHandler(
+        entry_points=[MessageHandler(Filters.user(ADMINS) & Filters.forwarded & Filters.animation, add_db)],
+        states={
+            TITEL: [MessageHandler(Filters.text, add_titel)],
+            DESCRIPTION: [MessageHandler(Filters.text, add_description)],
+            KEYWORDS: [MessageHandler(Filters.text, add_keyword), CommandHandler('finish', finish)]
+        },
+        fallbacks=[CommandHandler('cancel', cancel)],
+    )
+    dp.add_handler(conv_add_handler)
     dp.add_handler(InlineQueryHandler(inlinequery))
     updater.start_polling()
 
