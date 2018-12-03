@@ -26,7 +26,7 @@ Globalvariables = Variables()
 
 
 def text_creator(index):
-    text = "Have a look <a href=\"https://t.me/gifsupport/{}\">at this gif</a> :)".format(database["links"][index][2])
+    text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)".format(database["links"][index][2], database["links"][index][0])
     return InputTextMessageContent(text, ParseMode.HTML)
 
 
@@ -294,7 +294,8 @@ def main():
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("start", start))
     conv_update_handler = ConversationHandler(
-        entry_points=[CommandHandler("update", update_db, filters=Filters.user(ADMINS))],
+        # TODO Filters.user(ADMINS) & 
+        entry_points=[CommandHandler("update", update_db)],
 
         states={
             ENTRY: [CallbackQueryHandler(entry, pattern="update")],
@@ -309,7 +310,8 @@ def main():
     )
     dp.add_handler(conv_update_handler)
     conv_add_handler = ConversationHandler(
-        entry_points=[MessageHandler(Filters.user(ADMINS) & Filters.forwarded & Filters.animation, add_db)],
+        # TODO Filters.user(ADMINS) & 
+        entry_points=[MessageHandler(Filters.forwarded & Filters.animation, add_db)],
         states={
             TITEL: [MessageHandler(Filters.text, add_titel)],
             DESCRIPTION: [MessageHandler(Filters.text, add_description)],
