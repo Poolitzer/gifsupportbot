@@ -1,4 +1,3 @@
-from tokens import BOTTOKEN, ADMINS
 from uuid import uuid4
 from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, ParseMode
 from telegram.ext import CommandHandler, Updater, Filters, ConversationHandler, InlineQueryHandler, \
@@ -11,8 +10,8 @@ import re
 logging.basicConfig(filename="log.log", format='%(asctime)s - %(first_name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
-data_base = open('./database.json')
-database = json.load(data_base)
+database = json.load(open('./database.json'))
+tokenbase = json.load(open('./tokens.json'))
 
 ENTRY, CHANGEWHAT, UPDATE, CHANGE, TITEL, DESCRIPTION, KEYWORDS = range(7)
 
@@ -37,6 +36,20 @@ def start_admin(_, update):
 
 def start(_, update):
     update.message.reply_text("Go away.")
+
+
+def new_member(_, update):
+    for user in update.message.new_chat_members:
+        if user["id"] == 730048833:
+            update.message.reply_text("Hello group. I just wanted to mention that I wont moderate this group in any way"
+                                      ", because honestly, why would you ever need that, argh, I should do something "
+                                      "better with my time.")
+        else:
+            update.message.reply_text("Hello {}, nice to have you in this group. Ping Poolitzer if you have any "
+                                      "questions regarding this bot, and otherwise, enjoy your stay.")
+            tokenbase["ADMINS"].append(user["id"])
+            with open('./tokens.json', 'w') as outfile:
+                json.dump(tokenbase, outfile, indent=4, sort_keys=True)
 
 
 def inlinequery(_, update):
@@ -295,13 +308,13 @@ def cancel(_, update):
 
 
 def main():
-    updater = Updater(token=BOTTOKEN)
+    updater = Updater(token=tokenbase["BOTTOKEN"])
     dp = updater.dispatcher
-    # TODO Filters.user(ADMINS) and remove the other hashtag
+    # TODO Filters.user(private["ADMINS"]) and remove the other hashtag
     dp.add_handler(CommandHandler("start", start_admin))
     # dp.add_handler(CommandHandler("start", start))
     conv_update_handler = ConversationHandler(
-        # TODO Filters.user(ADMINS)
+        # TODO Filters.user(private["ADMINS"])
         entry_points=[CommandHandler("update", update_db)],
 
         states={
@@ -317,7 +330,7 @@ def main():
     )
     dp.add_handler(conv_update_handler)
     conv_add_handler = ConversationHandler(
-        # TODO Filters.user(ADMINS) & 
+        # TODO Filters.user(private["ADMINS"]) &
         entry_points=[MessageHandler(Filters.forwarded & Filters.animation, add_db)],
         states={
             TITEL: [MessageHandler(Filters.text, add_titel)],
@@ -328,6 +341,7 @@ def main():
     )
     dp.add_handler(conv_add_handler)
     dp.add_handler(InlineQueryHandler(inlinequery))
+    dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, new_member))
     updater.start_polling()
 
 
