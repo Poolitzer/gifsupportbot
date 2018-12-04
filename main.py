@@ -25,7 +25,8 @@ Globalvariables = Variables()
 
 
 def text_creator(index):
-    text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)".format(database["links"][index][2], database["links"][index][0])
+    text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)"\
+        .format(database["links"][index][2], database["links"][index][0])
     return InputTextMessageContent(text, ParseMode.HTML)
 
 
@@ -39,18 +40,20 @@ def start(_, update):
 
 
 def new_member(_, update):
-    for user in update.message.new_chat_members:
-        if user["id"] == 730048833:
-            update.message.reply_text("Hello group. I just wanted to mention that I wont moderate this group in any way"
-                                      ", because honestly, why would you ever need that, argh, I should do something "
-                                      "better with my time.")
-        else:
-            update.message.reply_text("Hello {}, nice to have you in this group. Ping Poolitzer if you have any "
-                                      "questions regarding this bot, and otherwise, enjoy your stay."
-                                      .format(user["first_name"]))
-            tokenbase["ADMINS"].append(user["id"])
-            with open('./tokens.json', 'w') as outfile:
-                json.dump(tokenbase, outfile, indent=4, sort_keys=True)
+    if update.effective_chat.id == -1001374913393:
+        for user in update.message.new_chat_members:
+            if user["id"] == 730048833:
+                update.message.reply_text("Hello group. I just wanted to mention that I wont moderate this group in any"
+                                          " way, because honestly, why would you ever need that, argh, I should do "
+                                          "something better with my time. Pool, you idiot, the ID is {}"
+                                          .format(update.effective_chat.id))
+            else:
+                update.message.reply_text("Hello {}, nice to have you in this group. Ping Poolitzer if you have any "
+                                          "questions regarding this bot, and otherwise, enjoy your stay."
+                                          .format(user["first_name"]))
+                tokenbase["ADMINS"].append(user["id"])
+                with open('./tokens.json', 'w') as outfile:
+                    json.dump(tokenbase, outfile, indent=4, sort_keys=True)
 
 
 def inlinequery(_, update):
@@ -311,12 +314,10 @@ def cancel(_, update):
 def main():
     updater = Updater(token=tokenbase["BOTTOKEN"])
     dp = updater.dispatcher
-    # TODO Filters.user(private["ADMINS"]) and remove the other hashtag
-    dp.add_handler(CommandHandler("start", start_admin))
-    # dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("start", start_admin, filters=Filters.user(tokenbase["ADMINS"])))
+    dp.add_handler(CommandHandler("start", start))
     conv_update_handler = ConversationHandler(
-        # TODO Filters.user(private["ADMINS"])
-        entry_points=[CommandHandler("update", update_db)],
+        entry_points=[CommandHandler("update", update_db, Filters.user(tokenbase["ADMINS"]))],
 
         states={
             ENTRY: [CallbackQueryHandler(entry, pattern="update")],
@@ -331,8 +332,8 @@ def main():
     )
     dp.add_handler(conv_update_handler)
     conv_add_handler = ConversationHandler(
-        # TODO Filters.user(private["ADMINS"]) &
-        entry_points=[MessageHandler(Filters.forwarded & Filters.animation, add_db)],
+        entry_points=[MessageHandler(Filters.user(tokenbase["ADMINS"]) & Filters.forwarded & Filters.animation,
+                                     add_db)],
         states={
             TITEL: [MessageHandler(Filters.text, add_titel)],
             DESCRIPTION: [MessageHandler(Filters.text, add_description)],
