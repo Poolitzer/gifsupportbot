@@ -30,8 +30,13 @@ def text_creator(index):
     return InputTextMessageContent(text, ParseMode.HTML)
 
 
+def start_admin(_, update):
+    update.message.reply_text('Hi! Run /update to update an existing GIF, forward me one from the channel to add it and'
+                              " don't forget that you can use /cancel almost every time.")
+
+
 def start(_, update):
-    update.message.reply_text('Hi! If you are an admin, run /update to update an existing one')
+    update.message.reply_text("Go away.")
 
 
 def inlinequery(_, update):
@@ -292,9 +297,11 @@ def cancel(_, update):
 def main():
     updater = Updater(token=BOTTOKEN)
     dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start))
+    # TODO Filters.user(ADMINS) and remove the other hashtag
+    dp.add_handler(CommandHandler("start", start_admin))
+    # dp.add_handler(CommandHandler("start", start))
     conv_update_handler = ConversationHandler(
-        # TODO Filters.user(ADMINS) & 
+        # TODO Filters.user(ADMINS)
         entry_points=[CommandHandler("update", update_db)],
 
         states={
