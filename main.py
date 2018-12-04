@@ -46,7 +46,8 @@ def new_member(_, update):
                                       "better with my time.")
         else:
             update.message.reply_text("Hello {}, nice to have you in this group. Ping Poolitzer if you have any "
-                                      "questions regarding this bot, and otherwise, enjoy your stay.")
+                                      "questions regarding this bot, and otherwise, enjoy your stay."
+                                      .format(user["first_name"]))
             tokenbase["ADMINS"].append(user["id"])
             with open('./tokens.json', 'w') as outfile:
                 json.dump(tokenbase, outfile, indent=4, sort_keys=True)
