@@ -10,6 +10,11 @@
             "android"
         ]
     ],
+    "keywords_demo": [
+        [
+            "Hmmm"
+        ]
+    ],
     "links": [
         [
             "Del messages an",
@@ -20,6 +25,14 @@
             "logout android",
             "How to logout on android",
             26
+        ]
+    ],
+    "links_demo": [
+        [
+            "Test!",
+            "This is a test",
+            5,
+            "DEMO"
         ]
     ]
 }

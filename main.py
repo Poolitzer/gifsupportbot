@@ -60,15 +60,22 @@ def inlinequery(_, update):
     query = update.inline_query.query
     results = []
     amount = 0
-    for index, words in enumerate(database["keywords"]):
+    if query.lower().startswith("demo"):
+        query = query[4:len(query)]
+        keywords = "keywords_demo"
+        links = "links_demo"
+    else:
+        keywords = "keywords"
+        links = "links"
+    for index, words in enumerate(database[keywords]):
         for word in words:
             payload = re.search(query, word)
             if payload:
                 results.append(InlineQueryResultArticle(
                     id=uuid4(),
-                    title=database["links"][index][0],
+                    title=database[links][index][0],
                     input_message_content=text_creator(index),
-                    description=database["links"][index][1]
+                    description=database[links][index][1]
                 ))
                 amount += 1
                 if amount == 5:
@@ -136,7 +143,6 @@ def change(_, update):
         Globalvariables.variable = [index, 2]
         return UPDATE
     elif todo == 4:
-
         temp = []
         subtemp = []
         x = 0
@@ -259,6 +265,10 @@ def add_db(_, update):
             Globalvariables.add = [0, 0, update.message.forward_from_message_id]
             update.message.reply_text("Great, a new GIF. Please send its titel :) Use /cancel anytime to cancel.")
             return TITEL
+    elif update.message.forward_from_chat.id == -1001353632441:
+        Globalvariables.add = [0, 0, update.message.forward_from_message_id, "DEMO"]
+        update.message.reply_text("Great, a new demo GIF. Please send its titel :) Use /cancel anytime to cancel.")
+        return TITEL
     else:
         update.message.reply_text("Haha, funny. Please forward me an animation from the botsupport channel smh")
         return ConversationHandler.END
@@ -273,15 +283,21 @@ def add_titel(_, update):
 
 def add_description(_, update):
     Globalvariables.add[1] = update.message.text
-    database["links"].append(Globalvariables.add)
-    Globalvariables.add = []
+    try:
+        if Globalvariables.add[3]:
+            del Globalvariables.add[3]
+            database["links_demo"].append(Globalvariables.add)
+            Globalvariables.add = ["DEMO"]
+    except IndexError:
+        database["links"].append(Globalvariables.add)
+        Globalvariables.add = []
     update.message.reply_text("The description is <b>{}</b>. Lets head over to keywords, send me one."
                               .format(update.message.text), parse_mode=ParseMode.HTML)
     return KEYWORDS
 
 
 def add_keyword(_, update):
-    messages = ["No one will see this. Sad story. Welp, there we go",
+    messages = ["No one will see this. Sad story. Moving on",
                 "You added the keyword <b>{}</b>. If you want to add another one, send it. If you are finished, send "
                 "/finish.", "Heyy. A second keyword. It's <b>{}</b>, right?",
                 "A third? Well, thats cool. <b>{}</b> this time.", "A fourth? :OOO <b>{}</b>. Don't forget /finish...",
@@ -298,7 +314,12 @@ def add_keyword(_, update):
 
 
 def finish(_, update):
-    database["keywords"].append(Globalvariables.add)
+    try:
+        if Globalvariables.add[0] == "DEMO":
+            del Globalvariables.add[0]
+            database["keywords_demo"].append(Globalvariables.add)
+    except IndexError:
+        database["keywords"].append(Globalvariables.add)
     Globalvariables.add = []
     with open('./database.json', 'w') as outfile:
         json.dump(database, outfile, indent=4, sort_keys=True)
