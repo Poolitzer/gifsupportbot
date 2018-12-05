@@ -1,4 +1,5 @@
 from uuid import uuid4
+from github import Github
 from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, ParseMode
 from telegram.ext import CommandHandler, Updater, Filters, ConversationHandler, InlineQueryHandler, \
     CallbackQueryHandler, MessageHandler
@@ -15,6 +16,7 @@ tokenbase = json.load(open('./tokens.json'))
 
 ENTRY, CHANGEWHAT, UPDATE, CHANGE, TITEL, DESCRIPTION, KEYWORDS = range(7)
 
+g = Github(tokenbase["GITHUBTOKEN"])
 
 class Variables:
     variable = []
@@ -224,32 +226,24 @@ def pass_update(_, update):
         update.message.reply_text("Changed title from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
         database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = update.message.text
-        with open('./database.json', 'w') as outfile:
-            json.dump(database, outfile, indent=4, sort_keys=True)
     elif Globalvariables.variable[1] == 1:
         update.message.reply_text("Changed description from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
         database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = update.message.text
-        with open('./database.json', 'w') as outfile:
-            json.dump(database, outfile, indent=4, sort_keys=True)
     elif Globalvariables.variable[1] == 2:
         update.message.reply_text("Changed id from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
         database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = update.message.text
-        with open('./database.json', 'w') as outfile:
-            json.dump(database, outfile, indent=4, sort_keys=True)
     elif Globalvariables.variable[1] == 3:
         update.message.reply_text("Changed keyword from {} to {}.".format(
             database["keywords"][Globalvariables.variable[0]][Globalvariables.variable[2]], update.message.text))
         database["keywords"][Globalvariables.variable[0]][Globalvariables.variable[2]] = update.message.text
-        with open('./database.json', 'w') as outfile:
-            json.dump(database, outfile, indent=4, sort_keys=True)
     elif Globalvariables.variable[1] == 4:
         update.message.reply_text("Added keyword {} to {}.".format(
             update.message.text, database["links"][Globalvariables.variable[0]][0]))
         database["keywords"][Globalvariables.variable[0]].append(update.message.text)
-        with open('./database.json', 'w') as outfile:
-            json.dump(database, outfile, indent=4, sort_keys=True)
+    with open('./database.json', 'w') as outfile:
+        json.dump(database, outfile, indent=4, sort_keys=True)
     return ConversationHandler.END
 
 
@@ -324,6 +318,10 @@ def finish(_, update):
     with open('./database.json', 'w') as outfile:
         json.dump(database, outfile, indent=4, sort_keys=True)
     update.message.reply_text("SUCCESS. Thanks for adding a post. Have a good one".format(update.message.text))
+    repo = g.get_repo('Poolitzer/gifsupportbot')
+    contents = repo.get_contents("database.json", ref="master")
+    repo.update_file(contents.path, "Automatically update database", json.dumps(database, indent=4, sort_keys=True),
+                     contents.sha)
     return ConversationHandler.END
 
 
