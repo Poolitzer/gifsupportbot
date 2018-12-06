@@ -4,6 +4,7 @@ from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKe
 from telegram.ext import CommandHandler, Updater, Filters, ConversationHandler, InlineQueryHandler, \
     CallbackQueryHandler, MessageHandler
 from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
+from telegram.utils.helpers import mention_html
 import json
 import logging
 import re
@@ -53,7 +54,8 @@ def new_member(_, update):
             else:
                 update.message.reply_text("Hello {}, nice to have you in this group. Ping Poolitzer if you have any "
                                           "questions regarding this bot, and otherwise, enjoy your stay."
-                                          .format(user["first_name"]))
+                                          .format(mention_html(user["id"], user["first_name"])),
+                                          parsemode=ParseMode.HTML)
                 tokenbase["ADMINS"].append(user["id"])
                 with open('./tokens.json', 'w') as outfile:
                     json.dump(tokenbase, outfile, indent=4, sort_keys=True)
@@ -202,8 +204,9 @@ def change_keyword_for_real(bot, update):
         query.edit_message_text("Deleted :(")
         bot.send_message(-1001374913393, "{} deleted the keyword {} from the entry {}. Not so much chaos, panic, "
                                          "disorder 'n stuff I assume? "
-                         .format(update.effective_user.first_name, database["keywords"][index][index2],
-                                 database["links"][index][0]))
+                         .format(mention_html(update.effective_user.id, update.effective_user.first_name),
+                                 database["keywords"][index][index2], database["links"][index][0]),
+                         parse_mode=ParseMode.HTML)
         del database["keywords"][index][index2]
         with open('./database.json', 'w') as outfile:
             json.dump(database, outfile, indent=4, sort_keys=True)
@@ -214,13 +217,15 @@ def delete_entry(bot, update):
     query = update.callback_query
     length = int(query.data[6])
     index = int(query.data[7:7 + length])
-    todo = str(query.data[-1:-2])
-    if not todo == "no":
+    todo = str(query.data[-2:11])
+    if todo == "no":
         query.edit_message_text("We let it stay :)")
     else:
         query.edit_message_text("Deleted :(")
         bot.send_message(-1001374913393, "{} deleted {}. Chaos, panic, disorder 'n stuff."
-                         .format(update.effective_user.first_name, database["links"][index][0]))
+                         .format(mention_html(update.effective_user.id, update.effective_user.first_name),
+                                 database["links"][index][0]),
+                         parse_mode=ParseMode.HTML)
         del database["links"][index]
         del database["keywords"][index]
         with open('./database.json', 'w') as outfile:
@@ -233,36 +238,42 @@ def pass_update(bot, update):
         update.message.reply_text("Changed title from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
         bot.send_message(-1001374913393, "{} changed title from {} to {}."
-                         .format(update.effective_user.first_name, database["links"][Globalvariables.variable[0]][0],
-                                 update.message.text))
+                         .format(mention_html(update.effective_user.id, update.effective_user.first_name),
+                                 database["links"][Globalvariables.variable[0]][0], update.message.text),
+                         parse_mode=ParseMode.HTML)
         database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = update.message.text
     elif Globalvariables.variable[1] == 1:
         update.message.reply_text("Changed description from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
         bot.send_message(-1001374913393, "{} changed description from {} to {}."
-                         .format(update.effective_user.first_name,database["links"][Globalvariables.variable[0]][0],
-                                 update.message.text))
+                         .format(mention_html(update.effective_user.id, update.effective_user.first_name),
+                                 database["links"][Globalvariables.variable[0]][0], update.message.text),
+                         parse_mode=ParseMode.HTML)
         database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = update.message.text
     elif Globalvariables.variable[1] == 2:
         update.message.reply_text("Changed id from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
         bot.send_message(-1001374913393, "{} changed id from {} to {}."
-                         .format(update.effective_user.first_name, database["links"][Globalvariables.variable[0]][0],
-                                 update.message.text))
+                         .format(mention_html(update.effective_user.id, update.effective_user.first_name),
+                                 database["links"][Globalvariables.variable[0]][0], update.message.text),
+                         parse_mode=ParseMode.HTML)
         database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = update.message.text
     elif Globalvariables.variable[1] == 3:
         update.message.reply_text("Changed keyword from {} to {}.".format(
             database["keywords"][Globalvariables.variable[0]][Globalvariables.variable[2]], update.message.text))
         bot.send_message(-1001374913393, "{} changed keyword {} from {} to {}."
-                         .format(update.effective_user.first_name,database["links"][Globalvariables.variable[0]][0],
-                                 database["links"][Globalvariables.variable[0]][0], update.message.text))
+                         .format(mention_html(update.effective_user.id, update.effective_user.first_name),
+                                 database["links"][Globalvariables.variable[0]][0],
+                                 database["links"][Globalvariables.variable[0]][0], update.message.text),
+                         parse_mode=ParseMode.HTML)
         database["keywords"][Globalvariables.variable[0]][Globalvariables.variable[2]] = update.message.text
     elif Globalvariables.variable[1] == 4:
         update.message.reply_text("Added keyword {} to {}.".format(
             update.message.text, database["links"][Globalvariables.variable[0]][0]))
         bot.send_message(-1001374913393, "{} added keyword {} to {}."
-                         .format(update.effective_user.first_name, update.message.text,
-                                 database["links"][Globalvariables.variable[0]][0]))
+                         .format(mention_html(update.effective_user.id, update.effective_user.first_name),
+                                 update.message.text, database["links"][Globalvariables.variable[0]][0]),
+                         parse_mode=ParseMode.HTML)
         database["keywords"][Globalvariables.variable[0]].append(update.message.text)
     with open('./database.json', 'w') as outfile:
         json.dump(database, outfile, indent=4, sort_keys=True)
@@ -339,7 +350,9 @@ def finish(bot, update):
         bot.send_message(-1001374913393,
                          "Added {} to the database from {}, updated GitHub, pardon me for breathing which "
                          "I never do anyway, oh god this is so depressing"
-                         .format(database["links"][-1][0], update.effective_user.first_name))
+                         .format(database["links"][-1][0],
+                                 mention_html(update.effective_user.id, update.effective_user.first_name)),
+                         parse_mode=ParseMode.HTML)
         repo = g.get_repo('Poolitzer/gifsupportbot')
         contents = repo.get_contents("database.json", ref="master")
         repo.update_file(contents.path, "Automatically update database", json.dumps(database, indent=4, sort_keys=True),
