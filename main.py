@@ -18,6 +18,7 @@ ENTRY, CHANGEWHAT, UPDATE, CHANGE, TITEL, DESCRIPTION, KEYWORDS = range(7)
 
 g = Github(tokenbase["GITHUBTOKEN"])
 
+
 class Variables:
     variable = []
     add = []
@@ -27,7 +28,7 @@ Globalvariables = Variables()
 
 
 def text_creator(index):
-    text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)"\
+    text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)" \
         .format(database["links"][index][2], database["links"][index][0])
     return InputTextMessageContent(text, ParseMode.HTML)
 
@@ -186,7 +187,7 @@ def change_keyword(_, update):
         return CHANGE
 
 
-def change_keyword_for_real(_, update):
+def change_keyword_for_real(bot, update):
     query = update.callback_query
     length = int(query.data[6])
     index = int(query.data[7:7 + length])
@@ -199,13 +200,17 @@ def change_keyword_for_real(_, update):
         return UPDATE
     else:
         query.edit_message_text("Deleted :(")
+        bot.send_message(-1001374913393, "{} deleted the keyword {} from the entry {}. Not so much chaos, panic, "
+                                         "disorder 'n stuff I assume? "
+                         .format(update.effective_user.first_name, database["keywords"][index][index2],
+                                 database["links"][index][0]))
         del database["keywords"][index][index2]
         with open('./database.json', 'w') as outfile:
             json.dump(database, outfile, indent=4, sort_keys=True)
         return ConversationHandler.END
 
 
-def delete_entry(_, update):
+def delete_entry(bot, update):
     query = update.callback_query
     length = int(query.data[6])
     index = int(query.data[7:7 + length])
@@ -214,6 +219,8 @@ def delete_entry(_, update):
         query.edit_message_text("We let it stay :)")
     else:
         query.edit_message_text("Deleted :(")
+        bot.send_message(-1001374913393, "{} deleted {}. Chaos, panic, disorder 'n stuff."
+                         .format(update.effective_user.first_name, database["links"][index][0]))
         del database["links"][index]
         del database["keywords"][index]
         with open('./database.json', 'w') as outfile:
@@ -221,26 +228,41 @@ def delete_entry(_, update):
     return ConversationHandler.END
 
 
-def pass_update(_, update):
+def pass_update(bot, update):
     if Globalvariables.variable[1] == 0:
         update.message.reply_text("Changed title from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
+        bot.send_message(-1001374913393, "{} changed title from {} to {}."
+                         .format(update.effective_user.first_name, database["links"][Globalvariables.variable[0]][0],
+                                 update.message.text))
         database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = update.message.text
     elif Globalvariables.variable[1] == 1:
         update.message.reply_text("Changed description from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
+        bot.send_message(-1001374913393, "{} changed description from {} to {}."
+                         .format(update.effective_user.first_name,database["links"][Globalvariables.variable[0]][0],
+                                 update.message.text))
         database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = update.message.text
     elif Globalvariables.variable[1] == 2:
         update.message.reply_text("Changed id from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
+        bot.send_message(-1001374913393, "{} changed id from {} to {}."
+                         .format(update.effective_user.first_name, database["links"][Globalvariables.variable[0]][0],
+                                 update.message.text))
         database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = update.message.text
     elif Globalvariables.variable[1] == 3:
         update.message.reply_text("Changed keyword from {} to {}.".format(
             database["keywords"][Globalvariables.variable[0]][Globalvariables.variable[2]], update.message.text))
+        bot.send_message(-1001374913393, "{} changed keyword {} from {} to {}."
+                         .format(update.effective_user.first_name,database["links"][Globalvariables.variable[0]][0],
+                                 database["links"][Globalvariables.variable[0]][0], update.message.text))
         database["keywords"][Globalvariables.variable[0]][Globalvariables.variable[2]] = update.message.text
     elif Globalvariables.variable[1] == 4:
         update.message.reply_text("Added keyword {} to {}.".format(
             update.message.text, database["links"][Globalvariables.variable[0]][0]))
+        bot.send_message(-1001374913393, "{} added keyword {} to {}."
+                         .format(update.effective_user.first_name, update.message.text,
+                                 database["links"][Globalvariables.variable[0]][0]))
         database["keywords"][Globalvariables.variable[0]].append(update.message.text)
     with open('./database.json', 'w') as outfile:
         json.dump(database, outfile, indent=4, sort_keys=True)
@@ -307,21 +329,25 @@ def add_keyword(_, update):
     return KEYWORDS
 
 
-def finish(_, update):
+def finish(bot, update):
     try:
         if Globalvariables.add[0] == "DEMO":
             del Globalvariables.add[0]
             database["keywords_demo"].append(Globalvariables.add)
     except IndexError:
         database["keywords"].append(Globalvariables.add)
+        bot.send_message(-1001374913393,
+                         "Added {} to the database from {}, updated GitHub, pardon me for breathing which "
+                         "I never do anyway, oh god this is so depressing"
+                         .format(database["links"][-1][0], update.effective_user.first_name))
+        repo = g.get_repo('Poolitzer/gifsupportbot')
+        contents = repo.get_contents("database.json", ref="master")
+        repo.update_file(contents.path, "Automatically update database", json.dumps(database, indent=4, sort_keys=True),
+                         contents.sha)
     Globalvariables.add = []
     with open('./database.json', 'w') as outfile:
         json.dump(database, outfile, indent=4, sort_keys=True)
     update.message.reply_text("SUCCESS. Thanks for adding a post. Have a good one".format(update.message.text))
-    repo = g.get_repo('Poolitzer/gifsupportbot')
-    contents = repo.get_contents("database.json", ref="master")
-    repo.update_file(contents.path, "Automatically update database", json.dumps(database, indent=4, sort_keys=True),
-                     contents.sha)
     return ConversationHandler.END
 
 
