@@ -18,6 +18,7 @@ ENTRY, CHANGEWHAT, UPDATE, CHANGE, TITEL, DESCRIPTION, KEYWORDS = range(7)
 
 g = Github(tokenbase["GITHUBTOKEN"])
 
+
 class Variables:
     variable = []
     add = []
@@ -249,16 +250,13 @@ def pass_update(_, update):
 
 def add_db(_, update):
     if update.message.forward_from_chat.id == -1001353729458:
-        skip = False
         for post in database["links"]:
             if post[2] == update.message.forward_from_message_id:
-                skip = True
                 update.message.reply_text("Haha, funny. Please forward me a new post from the botsupport channel smh")
                 return ConversationHandler.END
-        if not skip:
-            Globalvariables.add = [0, 0, update.message.forward_from_message_id]
-            update.message.reply_text("Great, a new GIF. Please send its titel :) Use /cancel anytime to cancel.")
-            return TITEL
+        Globalvariables.add = [0, 0, update.message.forward_from_message_id]
+        update.message.reply_text("Great, a new GIF. Please send its titel :) Use /cancel anytime to cancel.")
+        return TITEL
     elif update.message.forward_from_chat.id == -1001353632441:
         Globalvariables.add = [0, 0, update.message.forward_from_message_id, "DEMO"]
         update.message.reply_text("Great, a new demo GIF. Please send its titel :) Use /cancel anytime to cancel.")
