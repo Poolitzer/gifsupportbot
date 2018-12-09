@@ -40,9 +40,15 @@ def text_creator_demo(index):
     return InputTextMessageContent(text, ParseMode.HTML)
 
 
-def start_admin(_, update):
-    update.message.reply_text('Hi! Run /update to update an existing GIF, forward me one from the channel to add it and'
-                              " don't forget that you can use /cancel almost every time.")
+def start_admin(_, update, args):
+    if args:
+        Globalvariables.add = [0, 0, args[0]]
+        update.message.reply_text("Great. lets do it then. Send me a fitting title please")
+        return TITEL
+    else:
+        update.message.reply_text('Hi! Run /update to update an existing GIF, forward me one from the channel to add it'
+                                  " and don't forget that you can use /cancel almost every time.")
+        return ConversationHandler.END
 
 
 def start(_, update):
@@ -338,13 +344,18 @@ def add_link(bot, update):
     return CALLBACK
 
 
-def queryhandler(_, update):
+def queryhandler(bot, update):
     query = update.callback_query
     if query.data == "yes":
         query.edit_message_text("Great. lets do it then. Send me a fitting title please")
         return TITEL
     else:
         query.edit_message_text("Awww :(")
+        button = InlineKeyboardMarkup([[InlineKeyboardButton("Start",  url="https://t.me/GIFSupportbot/?start={}"
+                                      .format(Globalvariables.add[2]))]])
+        bot.send_message(-1001374913393, "Does someone have enough time to add <a href=\"https://t.me/gifsupport/{}\">"
+                                         "this post</a> to my database?".
+                         format(Globalvariables.add[2]), reply_markup=button, parse_mode=ParseMode.HTML)
         return ConversationHandler.END
 
 
@@ -419,7 +430,6 @@ def cancel(_, update):
 def main():
     updater = Updater(token=tokenbase["BOTTOKEN"])
     dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start_admin, filters=Filters.user(tokenbase["ADMINS"])))
     dp.add_handler(CommandHandler("start", start))
     conv_update_handler = ConversationHandler(
         entry_points=[CommandHandler("update", update_db, Filters.user(tokenbase["ADMINS"]))],
@@ -438,7 +448,8 @@ def main():
     dp.add_handler(conv_update_handler)
     conv_add_handler = ConversationHandler(
         entry_points=[MessageHandler(Filters.user(tokenbase["ADMINS"]) & Filters.animation,
-                                     add_db)],
+                                     add_db),
+                      CommandHandler("start", start_admin, filters=Filters.user(tokenbase["ADMINS"]), pass_args=True)],
         states={
             QUESTION: [MessageHandler(Filters.text, add_question)],
             DEVICE: [MessageHandler(Filters.text, add_device)],
