@@ -15,7 +15,7 @@ logging.basicConfig(filename="log.log", format='%(asctime)s - %(first_name)s - %
 database = json.load(open('./database.json'))
 tokenbase = json.load(open('./tokens.json'))
 
-ENTRY, CHANGEWHAT, UPDATE, CHANGE, TITEL, DESCRIPTION, KEYWORDS = range(7)
+ENTRY, CHANGEWHAT, UPDATE, CHANGE, TITEL, DESCRIPTION, KEYWORDS, QUESTION, DEVICE, LINK, CALLBACK = range(11)
 
 g = Github(tokenbase["GITHUBTOKEN"])
 
@@ -31,6 +31,12 @@ Globalvariables = Variables()
 def text_creator(index):
     text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)" \
         .format(database["links"][index][2], database["links"][index][0])
+    return InputTextMessageContent(text, ParseMode.HTML)
+
+
+def text_creator_demo(index):
+    text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)" \
+        .format(database["links_demo"][index][2], database["links_demo"][index][0])
     return InputTextMessageContent(text, ParseMode.HTML)
 
 
@@ -65,22 +71,42 @@ def inlinequery(_, update):
     query = update.inline_query.query
     results = []
     amount = 0
-    if query.lower().startswith("demo"):
-        query = query[4:len(query)]
-        keywords = "keywords_demo"
-        links = "links_demo"
-    else:
-        keywords = "keywords"
-        links = "links"
-    for index, words in enumerate(database[keywords]):
+    for index, words in enumerate(database["keywords"]):
         for word in words:
             payload = re.search(query, word)
             if payload:
                 results.append(InlineQueryResultArticle(
                     id=uuid4(),
-                    title=database[links][index][0],
+                    title=database["links"][index][0],
                     input_message_content=text_creator(index),
-                    description=database[links][index][1]
+                    description=database["links"][index][1]
+                ))
+                amount += 1
+                if amount == 5:
+                    update.inline_query.answer(results)
+                    break
+                else:
+                    break
+            else:
+                pass
+    if amount <= 4:
+        update.inline_query.answer(results)
+
+
+def demoinlinequery(_, update):
+    query = update.inline_query.query
+    results = []
+    amount = 0
+    query = query[4:len(query)]
+    for index, words in enumerate(database["keywords_demo"]):
+        for word in words:
+            payload = re.search(query, word)
+            if payload:
+                results.append(InlineQueryResultArticle(
+                    id=uuid4(),
+                    title=database["links_demo"][index][0],
+                    input_message_content=text_creator_demo(index),
+                    description=database["links_demo"][index][1]
                 ))
                 amount += 1
                 if amount == 5:
@@ -202,7 +228,7 @@ def change_keyword_for_real(bot, update):
         return UPDATE
     else:
         query.edit_message_text("Deleted :(")
-        bot.send_message(-1001374913393, "{} deleted the keyword {} from the entry {}. Not so much chaos, panic, "
+        bot.send_message(-1001214567646, "{} deleted the keyword {} from the entry {}. Not so much chaos, panic, "
                                          "disorder 'n stuff I assume? "
                          .format(mention_html(update.effective_user.id, update.effective_user.first_name),
                                  database["keywords"][index][index2], database["links"][index][0]),
@@ -222,7 +248,7 @@ def delete_entry(bot, update):
         query.edit_message_text("We let it stay :)")
     else:
         query.edit_message_text("Deleted :(")
-        bot.send_message(-1001374913393, "{} deleted {}. Chaos, panic, disorder 'n stuff."
+        bot.send_message(-1001214567646, "{} deleted {}. Chaos, panic, disorder 'n stuff."
                          .format(mention_html(update.effective_user.id, update.effective_user.first_name),
                                  database["links"][index][0]),
                          parse_mode=ParseMode.HTML)
@@ -237,7 +263,7 @@ def pass_update(bot, update):
     if Globalvariables.variable[1] == 0:
         update.message.reply_text("Changed title from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
-        bot.send_message(-1001374913393, "{} changed title from {} to {}."
+        bot.send_message(-1001214567646, "{} changed title from {} to {}."
                          .format(mention_html(update.effective_user.id, update.effective_user.first_name),
                                  database["links"][Globalvariables.variable[0]][0], update.message.text),
                          parse_mode=ParseMode.HTML)
@@ -245,7 +271,7 @@ def pass_update(bot, update):
     elif Globalvariables.variable[1] == 1:
         update.message.reply_text("Changed description from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
-        bot.send_message(-1001374913393, "{} changed description from {} to {}."
+        bot.send_message(-1001214567646, "{} changed description from {} to {}."
                          .format(mention_html(update.effective_user.id, update.effective_user.first_name),
                                  database["links"][Globalvariables.variable[0]][0], update.message.text),
                          parse_mode=ParseMode.HTML)
@@ -253,7 +279,7 @@ def pass_update(bot, update):
     elif Globalvariables.variable[1] == 2:
         update.message.reply_text("Changed id from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
-        bot.send_message(-1001374913393, "{} changed id from {} to {}."
+        bot.send_message(-1001214567646, "{} changed id from {} to {}."
                          .format(mention_html(update.effective_user.id, update.effective_user.first_name),
                                  database["links"][Globalvariables.variable[0]][0], update.message.text),
                          parse_mode=ParseMode.HTML)
@@ -261,7 +287,7 @@ def pass_update(bot, update):
     elif Globalvariables.variable[1] == 3:
         update.message.reply_text("Changed keyword from {} to {}.".format(
             database["keywords"][Globalvariables.variable[0]][Globalvariables.variable[2]], update.message.text))
-        bot.send_message(-1001374913393, "{} changed keyword {} from {} to {}."
+        bot.send_message(-1001214567646, "{} changed keyword {} from {} to {}."
                          .format(mention_html(update.effective_user.id, update.effective_user.first_name),
                                  database["links"][Globalvariables.variable[0]][0],
                                  database["links"][Globalvariables.variable[0]][0], update.message.text),
@@ -270,7 +296,7 @@ def pass_update(bot, update):
     elif Globalvariables.variable[1] == 4:
         update.message.reply_text("Added keyword {} to {}.".format(
             update.message.text, database["links"][Globalvariables.variable[0]][0]))
-        bot.send_message(-1001374913393, "{} added keyword {} to {}."
+        bot.send_message(-1001214567646, "{} added keyword {} to {}."
                          .format(mention_html(update.effective_user.id, update.effective_user.first_name),
                                  update.message.text, database["links"][Globalvariables.variable[0]][0]),
                          parse_mode=ParseMode.HTML)
@@ -281,24 +307,48 @@ def pass_update(bot, update):
 
 
 def add_db(_, update):
-    if update.message.forward_from_chat.id == -1001353729458:
-        for post in database["links"]:
-            if post[2] == update.message.forward_from_message_id:
-                update.message.reply_text("Haha, funny. Please forward me a new post from the botsupport channel smh")
-                return ConversationHandler.END
-        Globalvariables.add = [0, 0, update.message.forward_from_message_id]
-        update.message.reply_text("Great, a new GIF. Please send its titel :) Use /cancel anytime to cancel.")
-        return TITEL
-    elif update.message.forward_from_chat.id == -1001353632441:
-        Globalvariables.add = [0, 0, update.message.forward_from_message_id, "DEMO"]
-        update.message.reply_text("Great, a new demo GIF. Please send its titel :) Use /cancel anytime to cancel.")
+    Globalvariables.add = [update.message.animation.file_id, "Title", "Device", "link"]
+    update.message.reply_text("Great, a new GIF. Please send its question :) Use /cancel anytime to cancel.")
+    return QUESTION
+
+
+def add_question(_, update):
+    Globalvariables.add[1] = update.message.text
+    update.message.reply_text("Got the Question. Now the device please :) Use /cancel anytime to cancel.")
+    return DEVICE
+
+
+def add_device(_, update):
+    Globalvariables.add[2] = update.message.text
+    update.message.reply_text("My favourite device tbh. Now the link, we are done then :) "
+                              "Use /cancel anytime to cancel.")
+    return LINK
+
+
+def add_link(bot, update):
+    Globalvariables.add[3] = update.message.text
+    caption = "{}\n\n#{} #gifsupport\n\n<a href=\"{}\">More help</a>".format(
+        Globalvariables.add[1], Globalvariables.add[2], Globalvariables.add[3])
+    message = bot.send_animation(-1001353729458, Globalvariables.add[0], caption=caption, parse_mode=ParseMode.HTML)
+    Globalvariables.add = [0, 0, message.message_id]
+    buttons = InlineKeyboardMarkup([[InlineKeyboardButton("Yes", callback_data="yes"),
+                                    InlineKeyboardButton("No", callback_data="no")]])
+    update.message.reply_text("Thank you so much so far. Do you have the spare time to add this GIF to the database "
+                              "of this bot? Should take about 1 minute.", reply_markup=buttons)
+    return CALLBACK
+
+
+def queryhandler(_, update):
+    query = update.callback_query
+    if query.data == "yes":
+        query.edit_message_text("Great. lets do it then. Send me a fitting title please")
         return TITEL
     else:
-        update.message.reply_text("Haha, funny. Please forward me an animation from the botsupport channel smh")
+        query.edit_message_text("Awww :(")
         return ConversationHandler.END
 
 
-def add_titel(_, update):
+def add_title(_, update):
     Globalvariables.add[0] = update.message.text
     update.message.reply_text("<b>{}</b> it is. Please send me a good description now"
                               .format(update.message.text), parse_mode=ParseMode.HTML)
@@ -387,18 +437,24 @@ def main():
     )
     dp.add_handler(conv_update_handler)
     conv_add_handler = ConversationHandler(
-        entry_points=[MessageHandler(Filters.user(tokenbase["ADMINS"]) & Filters.forwarded & Filters.animation,
+        entry_points=[MessageHandler(Filters.user(tokenbase["ADMINS"]) & Filters.animation,
                                      add_db)],
         states={
-            TITEL: [MessageHandler(Filters.text, add_titel)],
+            QUESTION: [MessageHandler(Filters.text, add_question)],
+            DEVICE: [MessageHandler(Filters.text, add_device)],
+            LINK: [MessageHandler(Filters.text, add_link)],
+            CALLBACK: [CallbackQueryHandler(queryhandler)],
+            TITEL: [MessageHandler(Filters.text, add_title)],
             DESCRIPTION: [MessageHandler(Filters.text, add_description)],
             KEYWORDS: [MessageHandler(Filters.text, add_keyword), CommandHandler('finish', finish)]
         },
         fallbacks=[CommandHandler('cancel', cancel)],
     )
     dp.add_handler(conv_add_handler)
+    dp.add_handler(InlineQueryHandler(demoinlinequery, pattern="demo"))
     dp.add_handler(InlineQueryHandler(inlinequery))
     dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, new_member))
+    updater.bot.send_message(-1001214567646, "Not Linus bot online")
     updater.start_polling()
 
 
