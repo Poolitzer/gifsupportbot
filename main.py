@@ -48,8 +48,8 @@ class Database:
     def update_vote(self, post_id, voter_id, votes):
         temp = self.db.posts.find_one({"post_id": post_id})['voters']
         for voter in temp:
-            if voter["id"] == voter_id:
-                voter["voted"] = votes
+            if voter.id == voter_id:
+                voter.voted = votes
         self.db.posts.update_one({"post_id": post_id}, {"$set": {'voters': temp}})
 
 
@@ -88,9 +88,9 @@ def markup_creator(post_id):
     pro = 0
     con = 0
     for voter in Database.db.posts.find_one({"post_id": post_id})["voters"]:
-        if voter["voted"] == 1:
+        if voter.voted == 1:
             pro += 1
-        if voter["voted"] == -1:
+        if voter.voted == -1:
             con += 1
     return InlineKeyboardMarkup([[InlineKeyboardButton("👍{}".format(pro), callback_data="vote_yes"),
                                   InlineKeyboardButton("👎{}".format(con), callback_data="vote_no")]])
@@ -208,13 +208,11 @@ def vote(_, update):
                     query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
                     return
     if todo == "no":
-        Database.insert_voter(query.message.message_id,
-                              vars(Voter(user.id, user.mention_html(), user.language_code, -1)))
+        Database.insert_voter(query.message.message_id, Voter(user.id, user.mention_html(), user.language_code, -1))
         query.answer("You voted against it")
         query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
     else:
-        Database.insert_voter(query.message.message_id,
-                              vars(Voter(user.id, user.mention_html(), user.language_code, 1)))
+        Database.insert_voter(query.message.message_id, Voter(user.id, user.mention_html(), user.language_code, 1))
         query.answer("You voted in favour of it")
         query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
 
