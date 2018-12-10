@@ -8,6 +8,7 @@ from telegram.utils.helpers import mention_html
 import json
 import logging
 import re
+from pymongo import MongoClient
 
 logging.basicConfig(filename="log.log", format='%(asctime)s - %(first_name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -28,6 +29,40 @@ class Variables:
 Globalvariables = Variables()
 
 
+class Database:
+
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        self.logger.debug("Database init")
+        self.db = MongoClient()
+        self.db = self.db["gifsupportbot"]
+
+    def insert_posts(self, posts):
+        self.db.posts.insert_one(posts)
+
+    def insert_voter(self, post_id, voter):
+        self.db.posts.find_one({"post_id": post_id})["voters"].append(voter)
+
+
+Database = Database()
+
+
+class Post:
+
+    def __init__(self, post_id):
+        self.post_id = post_id
+        self.voters = []
+
+
+class Voter:
+
+    def __init__(self, user_id, mention, lang_code, voted):
+        self.id = user_id
+        self.mention = mention
+        self.lang_code = lang_code
+        self.voted = voted
+
+
 def text_creator(index):
     text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)" \
         .format(database["links"][index][2], database["links"][index][0])
@@ -40,6 +75,18 @@ def text_creator_demo(index):
     return InputTextMessageContent(text, ParseMode.HTML)
 
 
+def markup_creator(post_id):
+    pro = 0
+    con = 0
+    for voter in Database.db.posts.find_one({"post_id": post_id})["voters"]:
+        if voter["voted"] == 1:
+            pro += 1
+        if voter["voted"] == -1:
+            con += 1
+    return InlineKeyboardMarkup([[InlineKeyboardButton("👍{}".format(pro), callback_data="vote_yes"),
+                                  InlineKeyboardButton("👎{}".format(con), callback_data="vote_no")]])
+
+
 def start_admin(_, update, args):
     if args:
         Globalvariables.add = [0, 0, args[0]]
@@ -49,10 +96,6 @@ def start_admin(_, update, args):
         update.message.reply_text('Hi! Run /update to update an existing GIF, forward me one from the channel to add it'
                                   " and don't forget that you can use /cancel almost every time.")
         return ConversationHandler.END
-
-
-def start(_, update):
-    update.message.reply_text("Go away.")
 
 
 def new_member(_, update):
@@ -124,6 +167,46 @@ def demoinlinequery(_, update):
                 pass
     if amount <= 4:
         update.inline_query.answer(results)
+
+
+def vote(_, update):
+    print("hmm")
+    query = update.callback_query
+    todo = query.data[-2:len(query.data)]
+    user = query.from_user
+    post = Database.db.posts.find_one({"post_id": query.message.message_id})
+    for voter in post["voters"]:
+        if voter["id"] == user.id:
+            if todo == "no":
+                if voter["voted"] == -1:
+                    voter["voted"] = 0
+                    query.answer("You took your vote back")
+                    query.message.edit_reply_markup(markup_creator(query.message.message_id))
+                    return
+                else:
+                    voter["voted"] = -1
+                    query.answer("You voted against it")
+                    query.message.edit_reply_markup(markup_creator(query.message.message_id))
+                    return
+            else:
+                if voter["voted"] == 1:
+                    voter["voted"] = 0
+                    query.answer("You took your vote back")
+                    query.message.edit_reply_markup(markup_creator(query.message.message_id))
+                    return
+                else:
+                    voter["voted"] = 1
+                    query.answer("You voted in favour of it")
+                    query.message.edit_reply_markup(markup_creator(query.message.message_id))
+                    return
+    if todo == "no":
+        Database.insert_voter(query.message.message_id, Voter(user.id, user.mention_html(), user.language_code, -1))
+        query.answer("You voted against it")
+        query.message.edit_reply_markup(markup_creator(query.message.message_id))
+    else:
+        Database.insert_voter(query.message.message_id, Voter(user.id, user.mention_html(), user.language_code, 1))
+        query.answer("You voted in favour of it")
+        query.message.edit_reply_markup(markup_creator(query.message.message_id))
 
 
 def update_db(_, update):
@@ -336,11 +419,15 @@ def add_link(bot, update):
     caption = "{}\n\n#{} #gifsupport\n\n<a href=\"{}\">More help</a>".format(
         Globalvariables.add[1], Globalvariables.add[2], Globalvariables.add[3])
     message = bot.send_animation(-1001353729458, Globalvariables.add[0], caption=caption, parse_mode=ParseMode.HTML)
+    votebuttons = InlineKeyboardMarkup([[InlineKeyboardButton("👍", callback_data="vote_yes"),
+                                         InlineKeyboardButton("👎", callback_data="vote_no")]])
+    message.edit_reply_markup(reply_markup=votebuttons)
     Globalvariables.add = [0, 0, message.message_id]
     buttons = InlineKeyboardMarkup([[InlineKeyboardButton("Yes", callback_data="yes"),
-                                    InlineKeyboardButton("No", callback_data="no")]])
+                                     InlineKeyboardButton("No", callback_data="no")]])
     update.message.reply_text("Thank you so much so far. Do you have the spare time to add this GIF to the database "
                               "of this bot? Should take about 1 minute.", reply_markup=buttons)
+    Database.insert_posts(vars(Post(message.message_id)))
     return CALLBACK
 
 
@@ -351,8 +438,8 @@ def queryhandler(bot, update):
         return TITEL
     else:
         query.edit_message_text("Awww :(")
-        button = InlineKeyboardMarkup([[InlineKeyboardButton("Start",  url="https://t.me/GIFSupportbot/?start={}"
-                                      .format(Globalvariables.add[2]))]])
+        button = InlineKeyboardMarkup([[InlineKeyboardButton("Start", url="https://t.me/GIFSupportbot/?start={}"
+                                                             .format(Globalvariables.add[2]))]])
         bot.send_message(-1001374913393, "Does someone have enough time to add <a href=\"https://t.me/gifsupport/{}\">"
                                          "this post</a> to my database?".
                          format(Globalvariables.add[2]), reply_markup=button, parse_mode=ParseMode.HTML)
@@ -430,7 +517,6 @@ def cancel(_, update):
 def main():
     updater = Updater(token=tokenbase["BOTTOKEN"])
     dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start))
     conv_update_handler = ConversationHandler(
         entry_points=[CommandHandler("update", update_db, Filters.user(tokenbase["ADMINS"]))],
 
@@ -462,6 +548,7 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)],
     )
     dp.add_handler(conv_add_handler)
+    dp.add_handler(CallbackQueryHandler(vote, pattern="vote"))
     dp.add_handler(InlineQueryHandler(demoinlinequery, pattern="demo"))
     dp.add_handler(InlineQueryHandler(inlinequery))
     dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, new_member))
