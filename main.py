@@ -184,9 +184,9 @@ def vote(_, update):
     user = query.from_user
     post = Database.db.posts.find_one({"post_id": query.message.message_id})
     for voter in post["voters"]:
-        if voter["id"] == user.id:
+        if voter.id == user.id:
             if todo == "no":
-                if voter["voted"] == -1:
+                if voter.voted == -1:
                     Database.update_vote(query.message.message_id, user.id, 0)
                     query.answer("You took your vote back")
                     query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
@@ -197,7 +197,7 @@ def vote(_, update):
                     query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
                     return
             else:
-                if voter["voted"] == 1:
+                if voter.voted == 1:
                     Database.update_vote(query.message.message_id, user.id, 0)
                     query.answer("You took your vote back")
                     query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
@@ -216,8 +216,7 @@ def vote(_, update):
         Database.insert_voter(query.message.message_id,
                               vars(Voter(user.id, user.mention_html(), user.language_code, 1)))
         query.answer("You voted in favour of it")
-        hrmpf = markup_creator(query.message.message_id)
-        query.message.edit_reply_markup(reply_markup=hrmpf)
+        query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
 
 
 def update_db(_, update):
