@@ -41,7 +41,16 @@ class Database:
         self.db.posts.insert_one(posts)
 
     def insert_voter(self, post_id, voter):
-        self.db.posts.find_one({"post_id": post_id})["voters"].append(voter)
+        temp = self.db.posts.find_one({"post_id": post_id})['voters']
+        temp.append(voter)
+        self.db.posts.update_one({"post_id": post_id}, {"$set": {'voters': temp}})
+
+    def update_vote(self, post_id, voter_id, votes):
+        temp = self.db.posts.find_one({"post_id": post_id})['voters']
+        for voter in temp:
+            if voter["id"] == voter_id:
+                voter["voted"] = votes
+        self.db.posts.update_one({"post_id": post_id}, {"$set": {'voters': temp}})
 
 
 Database = Database()
@@ -170,7 +179,6 @@ def demoinlinequery(_, update):
 
 
 def vote(_, update):
-    print("hmm")
     query = update.callback_query
     todo = query.data[-2:len(query.data)]
     user = query.from_user
@@ -179,34 +187,37 @@ def vote(_, update):
         if voter["id"] == user.id:
             if todo == "no":
                 if voter["voted"] == -1:
-                    voter["voted"] = 0
+                    Database.update_vote(query.message.message_id, user.id, 0)
                     query.answer("You took your vote back")
-                    query.message.edit_reply_markup(markup_creator(query.message.message_id))
+                    query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
                     return
                 else:
-                    voter["voted"] = -1
+                    Database.update_vote(query.message.message_id, user.id, -1)
                     query.answer("You voted against it")
-                    query.message.edit_reply_markup(markup_creator(query.message.message_id))
+                    query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
                     return
             else:
                 if voter["voted"] == 1:
-                    voter["voted"] = 0
+                    Database.update_vote(query.message.message_id, user.id, 0)
                     query.answer("You took your vote back")
-                    query.message.edit_reply_markup(markup_creator(query.message.message_id))
+                    query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
                     return
                 else:
-                    voter["voted"] = 1
+                    Database.update_vote(query.message.message_id, user.id, 1)
                     query.answer("You voted in favour of it")
-                    query.message.edit_reply_markup(markup_creator(query.message.message_id))
+                    query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
                     return
     if todo == "no":
-        Database.insert_voter(query.message.message_id, Voter(user.id, user.mention_html(), user.language_code, -1))
+        Database.insert_voter(query.message.message_id,
+                              vars(Voter(user.id, user.mention_html(), user.language_code, -1)))
         query.answer("You voted against it")
-        query.message.edit_reply_markup(markup_creator(query.message.message_id))
+        query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
     else:
-        Database.insert_voter(query.message.message_id, Voter(user.id, user.mention_html(), user.language_code, 1))
+        Database.insert_voter(query.message.message_id,
+                              vars(Voter(user.id, user.mention_html(), user.language_code, 1)))
         query.answer("You voted in favour of it")
-        query.message.edit_reply_markup(markup_creator(query.message.message_id))
+        hrmpf = markup_creator(query.message.message_id)
+        query.message.edit_reply_markup(reply_markup=hrmpf)
 
 
 def update_db(_, update):
