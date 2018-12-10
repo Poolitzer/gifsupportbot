@@ -418,10 +418,10 @@ def add_link(bot, update):
     Globalvariables.add[3] = update.message.text
     caption = "{}\n\n#{} #gifsupport\n\n<a href=\"{}\">More help</a>".format(
         Globalvariables.add[1], Globalvariables.add[2], Globalvariables.add[3])
-    message = bot.send_animation(-1001353729458, Globalvariables.add[0], caption=caption, parse_mode=ParseMode.HTML)
     votebuttons = InlineKeyboardMarkup([[InlineKeyboardButton("👍", callback_data="vote_yes"),
                                          InlineKeyboardButton("👎", callback_data="vote_no")]])
-    message.edit_reply_markup(reply_markup=votebuttons)
+    message = bot.send_animation(-1001353729458, Globalvariables.add[0], caption=caption, parse_mode=ParseMode.HTML,
+                                 reply_markup=votebuttons)
     Globalvariables.add = [0, 0, message.message_id]
     buttons = InlineKeyboardMarkup([[InlineKeyboardButton("Yes", callback_data="yes"),
                                      InlineKeyboardButton("No", callback_data="no")]])
