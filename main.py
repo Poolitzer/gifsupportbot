@@ -16,7 +16,7 @@ logging.basicConfig(filename="log.log", format='%(asctime)s - %(first_name)s - %
 database = json.load(open('./database.json'))
 tokenbase = json.load(open('./tokens.json'))
 
-ENTRY, CHANGEWHAT, UPDATE, CHANGE, TITEL, DESCRIPTION, KEYWORDS, QUESTION, DEVICE, LINK, CALLBACK = range(11)
+ENTRY, CHANGEWHAT, UPDATE, CHANGE, TITEL, DESCRIPTION, KEYWORDS, QUESTION, DEVICE, LINK, CALLBACK, GIF = range(12)
 
 g = Github(tokenbase["GITHUBTOKEN"])
 
@@ -40,10 +40,18 @@ class Database:
     def insert_posts(self, posts):
         self.db.posts.insert_one(posts)
 
+    def insert_demo_posts(self, posts):
+        self.db.demo_posts.insert_one(posts)
+
     def insert_voter(self, post_id, voter):
         temp = self.db.posts.find_one({"post_id": post_id})['voters']
         temp.append(voter)
         self.db.posts.update_one({"post_id": post_id}, {"$set": {'voters': temp}})
+
+    def insert_demo_voter(self, post_id, voter):
+        temp = self.db.demo_posts.find_one({"post_id": post_id})['voters']
+        temp.append(voter)
+        self.db.demo_posts.update_one({"post_id": post_id}, {"$set": {'voters': temp}})
 
     def update_vote(self, post_id, voter_id, votes):
         temp = self.db.posts.find_one({"post_id": post_id})['voters']
@@ -51,6 +59,13 @@ class Database:
             if voter["id"] == voter_id:
                 voter["voted"] = votes
         self.db.posts.update_one({"post_id": post_id}, {"$set": {'voters': temp}})
+
+    def update_demo_vote(self, post_id, voter_id, votes):
+        temp = self.db.demo_posts.find_one({"post_id": post_id})['voters']
+        for voter in temp:
+            if voter["id"] == voter_id:
+                voter["voted"] = votes
+        self.db.demo_posts.update_one({"post_id": post_id}, {"$set": {'voters': temp}})
 
 
 Database = Database()
@@ -98,7 +113,11 @@ def markup_creator(post_id):
 
 def start_admin(_, update, args):
     if args:
-        Globalvariables.add = [0, 0, args[0]]
+        args[0].split('_')
+        if args[1]:
+            Globalvariables.add = [0, 0, args[0], "DEMO"]
+        else:
+            Globalvariables.add = [0, 0, args[0]]
         update.message.reply_text("Great. lets do it then. Send me a fitting title please")
         return TITEL
     else:
@@ -405,6 +424,18 @@ def pass_update(bot, update):
     return ConversationHandler.END
 
 
+def add_db_demo(_, update):
+    Globalvariables.add = [0, "Title", "Device", "link", "DEMO"]
+    update.message.reply_text("Ah DEMO GIF? Cool. Send the gif now. Use /cancel anytime to cancel.")
+    return GIF
+
+
+def add_gif_demo(_, update):
+    Globalvariables.add[0] = update.message.animation.file_id
+    update.message.reply_text("Alright. Please send its question :) Use /cancel anytime to cancel.")
+    return GIF
+
+
 def add_db(_, update):
     Globalvariables.add = [update.message.animation.file_id, "Title", "Device", "link"]
     update.message.reply_text("Great, a new GIF. Please send its question :) Use /cancel anytime to cancel.")
@@ -425,19 +456,31 @@ def add_device(_, update):
 
 
 def add_link(bot, update):
+    posting_id = -1001353729458
     Globalvariables.add[3] = update.message.text
     caption = "{}\n\n#{} #gifsupport\n\n<a href=\"{}\">More help</a>".format(
         Globalvariables.add[1], Globalvariables.add[2], Globalvariables.add[3])
     votebuttons = InlineKeyboardMarkup([[InlineKeyboardButton("👍", callback_data="vote_yes"),
                                          InlineKeyboardButton("👎", callback_data="vote_no")]])
-    message = bot.send_animation(-1001353729458, Globalvariables.add[0], caption=caption, parse_mode=ParseMode.HTML,
+    try:
+        if Globalvariables.add[3]:
+            del Globalvariables.add[3]
+            posting_id = -1001353632441
+            Globalvariables.add = [0, 0, 0, "DEMO"]
+    except IndexError:
+        Globalvariables.add = [0, 0, 0]
+    message = bot.send_animation(posting_id, Globalvariables.add[0], caption=caption, parse_mode=ParseMode.HTML,
                                  reply_markup=votebuttons)
-    Globalvariables.add = [0, 0, message.message_id]
     buttons = InlineKeyboardMarkup([[InlineKeyboardButton("Yes", callback_data="yes"),
                                      InlineKeyboardButton("No", callback_data="no")]])
     update.message.reply_text("Thank you so much so far. Do you have the spare time to add this GIF to the database "
                               "of this bot? Should take about 1 minute.", reply_markup=buttons)
-    Database.insert_posts(vars(Post(message.message_id)))
+    Globalvariables.add[2] = message.message_id
+    try:
+        if Globalvariables.add[3]:
+            Database.insert_demo_posts(vars(Post(message.message_id)))
+    except IndexError:
+        Database.insert_posts(vars(Post(message.message_id)))
     return CALLBACK
 
 
@@ -448,11 +491,19 @@ def queryhandler(bot, update):
         return TITEL
     else:
         query.edit_message_text("Awww :(")
-        button = InlineKeyboardMarkup([[InlineKeyboardButton("Start", url="https://t.me/GIFSupportbot/?start={}"
-                                                             .format(Globalvariables.add[2]))]])
-        bot.send_message(-1001374913393, "Does someone have enough time to add <a href=\"https://t.me/gifsupport/{}\">"
-                                         "this post</a> to my database?".
-                         format(Globalvariables.add[2]), reply_markup=button, parse_mode=ParseMode.HTML)
+        try:
+            if Globalvariables.add[3]:
+                button = InlineKeyboardMarkup([[InlineKeyboardButton("Start", url="https://t.me/GIFSupportbot/?start={}"
+                                                                     .format(Globalvariables.add[2] + "_DEMO"))]])
+                bot.send_message(-1001374913393,
+                                 "Anyone feels like adding the newest DEMO GIF? I mean. It would be nice...",
+                                 reply_markup=button, parse_mode=ParseMode.HTML)
+        except IndexError:
+            button = InlineKeyboardMarkup([[InlineKeyboardButton("Start", url="https://t.me/GIFSupportbot/?start={}"
+                                                                 .format(Globalvariables.add[2]))]])
+            bot.send_message(-1001374913393, "Does someone have enough time to add "
+                                             "<a href=\"https://t.me/gifsupport/{}\"> this post</a> to my database?".
+                             format(Globalvariables.add[2]), reply_markup=button, parse_mode=ParseMode.HTML)
         return ConversationHandler.END
 
 
@@ -545,8 +596,10 @@ def main():
     conv_add_handler = ConversationHandler(
         entry_points=[MessageHandler(Filters.user(tokenbase["ADMINS"]) & Filters.animation,
                                      add_db),
-                      CommandHandler("start", start_admin, filters=Filters.user(tokenbase["ADMINS"]), pass_args=True)],
+                      CommandHandler("start", start_admin, filters=Filters.user(tokenbase["ADMINS"]), pass_args=True),
+                      CommandHandler("demo", add_db_demo, filters=Filters.user(tokenbase["ADMINS"]))],
         states={
+            GIF: [MessageHandler(Filters.animation, add_gif_demo)],
             QUESTION: [MessageHandler(Filters.text, add_question)],
             DEVICE: [MessageHandler(Filters.text, add_device)],
             LINK: [MessageHandler(Filters.text, add_link)],
