@@ -111,13 +111,25 @@ def markup_creator(post_id):
                                   InlineKeyboardButton("👎{}".format(con), callback_data="vote_no")]])
 
 
+def markup_demo_creator(post_id):
+    pro = 0
+    con = 0
+    for voter in Database.db.demo_posts.find_one({"post_id": post_id})["voters"]:
+        if voter["voted"] == 1:
+            pro += 1
+        if voter["voted"] == -1:
+            con += 1
+    return InlineKeyboardMarkup([[InlineKeyboardButton("👍{}".format(pro), callback_data="demo_vote_yes"),
+                                  InlineKeyboardButton("👎{}".format(con), callback_data="demo_vote_no")]])
+
+
 def start_admin(_, update, args):
     if args:
         args[0].split('_')
         if args[1]:
-            Globalvariables.add = [0, 0, args[0], "DEMO"]
+            Globalvariables.add = [0, 0, int(args[0]), "DEMO"]
         else:
-            Globalvariables.add = [0, 0, args[0]]
+            Globalvariables.add = [0, 0, int(args[0])]
         update.message.reply_text("Great. lets do it then. Send me a fitting title please")
         return TITEL
     else:
@@ -202,40 +214,56 @@ def vote(_, update):
     todo = query.data[-2:len(query.data)]
     user = query.from_user
     post = Database.db.posts.find_one({"post_id": query.message.message_id})
+    update_vote = Database.update_vote
+    insert_vote = Database.insert_voter
+    markup = markup_creator
+    return real_vote(query, todo, user, post, update_vote, insert_vote, markup)
+
+
+def demovote(_, update):
+    query = update.callback_query
+    todo = query.data[-2:len(query.data)]
+    user = query.from_user
+    post = Database.db.demo_posts.find_one({"post_id": query.message.message_id})
+    update_vote = Database.update_demo_vote
+    insert_vote = Database.insert_demo_voter
+    markup = markup_demo_creator
+    return real_vote(query, todo, user, post, update_vote, insert_vote, markup)
+
+
+def real_vote(query, todo, user, post, update_vote, insert_voter, markup):
     for voter in post["voters"]:
         if voter["id"] == user.id:
             if todo == "no":
                 if voter["voted"] == -1:
-                    Database.update_vote(query.message.message_id, user.id, 0)
+                    update_vote(query.message.message_id, user.id, 0)
                     query.answer("You took your vote back")
-                    query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
+                    query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
                     return
                 else:
-                    Database.update_vote(query.message.message_id, user.id, -1)
+                    update_vote(query.message.message_id, user.id, -1)
                     query.answer("You voted against it")
-                    query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
+                    query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
                     return
             else:
                 if voter["voted"] == 1:
-                    Database.update_vote(query.message.message_id, user.id, 0)
+                    update_vote(query.message.message_id, user.id, 0)
                     query.answer("You took your vote back")
-                    query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
+                    query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
                     return
                 else:
-                    Database.update_vote(query.message.message_id, user.id, 1)
+                    update_vote(query.message.message_id, user.id, 1)
                     query.answer("You voted in favour of it")
-                    query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
+                    query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
                     return
     if todo == "no":
-        Database.insert_voter(query.message.message_id,
-                              vars(Voter(user.id, user.mention_html(), user.language_code, -1)))
+        insert_voter(query.message.message_id, vars(Voter(user.id, user.mention_html(), user.language_code, -1)))
         query.answer("You voted against it")
-        query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
+        query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
     else:
-        Database.insert_voter(query.message.message_id,
-                              vars(Voter(user.id, user.mention_html(), user.language_code, 1)))
+        insert_voter(query.message.message_id, vars(Voter(user.id, user.mention_html(), user.language_code, 1)))
         query.answer("You voted in favour of it")
-        query.message.edit_reply_markup(reply_markup=markup_creator(query.message.message_id))
+        query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
 
 
 def update_db(_, update):
@@ -433,7 +461,7 @@ def add_db_demo(_, update):
 def add_gif_demo(_, update):
     Globalvariables.add[0] = update.message.animation.file_id
     update.message.reply_text("Alright. Please send its question :) Use /cancel anytime to cancel.")
-    return GIF
+    return QUESTION
 
 
 def add_db(_, update):
@@ -463,12 +491,14 @@ def add_link(bot, update):
     votebuttons = InlineKeyboardMarkup([[InlineKeyboardButton("👍", callback_data="vote_yes"),
                                          InlineKeyboardButton("👎", callback_data="vote_no")]])
     try:
-        if Globalvariables.add[3]:
-            del Globalvariables.add[3]
-            posting_id = -1001353632441
-            Globalvariables.add = [0, 0, 0, "DEMO"]
+        if Globalvariables.add[4]:
+            del Globalvariables.add[4]
+            posting_id = -1001316476861
+            Globalvariables.add.append("DEMO")
+            votebuttons = InlineKeyboardMarkup([[InlineKeyboardButton("👍", callback_data="demo_vote_yes"),
+                                                 InlineKeyboardButton("👎", callback_data="demo_vote_no")]])
     except IndexError:
-        Globalvariables.add = [0, 0, 0]
+        pass
     message = bot.send_animation(posting_id, Globalvariables.add[0], caption=caption, parse_mode=ParseMode.HTML,
                                  reply_markup=votebuttons)
     buttons = InlineKeyboardMarkup([[InlineKeyboardButton("Yes", callback_data="yes"),
@@ -478,8 +508,10 @@ def add_link(bot, update):
     Globalvariables.add[2] = message.message_id
     try:
         if Globalvariables.add[3]:
+            Globalvariables.add = [0, 0, 0, "DEMO"]
             Database.insert_demo_posts(vars(Post(message.message_id)))
     except IndexError:
+        Globalvariables.add = [0, 0, 0]
         Database.insert_posts(vars(Post(message.message_id)))
     return CALLBACK
 
@@ -494,7 +526,7 @@ def queryhandler(bot, update):
         try:
             if Globalvariables.add[3]:
                 button = InlineKeyboardMarkup([[InlineKeyboardButton("Start", url="https://t.me/GIFSupportbot/?start={}"
-                                                                     .format(Globalvariables.add[2] + "_DEMO"))]])
+                                                                     .format(str(Globalvariables.add[2]) + "_DEMO"))]])
                 bot.send_message(-1001374913393,
                                  "Anyone feels like adding the newest DEMO GIF? I mean. It would be nice...",
                                  reply_markup=button, parse_mode=ParseMode.HTML)
@@ -612,6 +644,7 @@ def main():
     )
     dp.add_handler(conv_add_handler)
     dp.add_handler(CallbackQueryHandler(vote, pattern="vote"))
+    dp.add_handler(CallbackQueryHandler(demovote, pattern="demo"))
     dp.add_handler(InlineQueryHandler(demoinlinequery, pattern="demo"))
     dp.add_handler(InlineQueryHandler(inlinequery))
     dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, new_member))
