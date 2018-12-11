@@ -493,7 +493,7 @@ def add_link(bot, update):
     try:
         if Globalvariables.add[4]:
             del Globalvariables.add[4]
-            posting_id = -1001316476861
+            posting_id = -1001353632441
             Globalvariables.add.append("DEMO")
             votebuttons = InlineKeyboardMarkup([[InlineKeyboardButton("👍", callback_data="demo_vote_yes"),
                                                  InlineKeyboardButton("👎", callback_data="demo_vote_no")]])
