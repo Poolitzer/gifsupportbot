@@ -162,7 +162,7 @@ def inlinequery(_, update):
     amount = 0
     for index, words in enumerate(database["keywords"]):
         for word in words:
-            payload = re.search(query, word)
+            payload = re.search(query, word, re.IGNORECASE)
             if payload:
                 results.append(InlineQueryResultArticle(
                     id=uuid4(),
@@ -189,7 +189,7 @@ def demoinlinequery(_, update):
     query = query[4:len(query)]
     for index, words in enumerate(database["keywords_demo"]):
         for word in words:
-            payload = re.search(query, word)
+            payload = re.search(query, word, re.IGNORECASE)
             if payload:
                 results.append(InlineQueryResultArticle(
                     id=uuid4(),
