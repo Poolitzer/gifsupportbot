@@ -479,27 +479,51 @@ def add_db(_, update):
 
 def add_question(_, update):
     Globalvariables.add[1] = update.message.text
-    update.message.reply_text("Got the Question. Now the device please :) Use /cancel anytime to cancel.")
+    temp = []
+    subtemp = []
+    x = 0
+    for index, device in enumerate(database["devices"]):
+        subtemp.append(InlineKeyboardButton(device, callback_data="device{}".format(index)))
+        x += 1
+        if x is 2:
+            temp.append(subtemp)
+            subtemp = []
+            x = 0
+        elif device is database["devices"][-1] and x is 1:
+            temp.append(subtemp)
+    update.message.reply_text("Got the Question. Now choose a device please :) Use /cancel anytime to cancel.",
+                              reply_markup=InlineKeyboardMarkup(temp))
     return DEVICE
 
 
 def add_device(_, update):
-    for device in database["devices"]:
-        if update.message.text.lower() == device:
-            Globalvariables.add[2] = update.message.text.lower()
-            if device == "android":
-                update.message.reply_text("My favourite device tbh. Now the link, we are done then :) "
-                                          "Use /cancel anytime to cancel.")
-            elif device == "ios":
-                update.message.reply_text("Ihhh, an apple device. Now the link, we are done then :) "
-                                          "Use /cancel anytime to cancel.")
-            return LINK
-    update.message.reply_text("Sorry, you device isn't in my database. If its just a typo, send it again. If you "
-                              "believe that this is an error, ping @Poolitzer :)")
-    return DEVICE
+    query = update.callback_query
+    print(update.callback_query.data)
+    index = int(query.data[-1])
+    Globalvariables.add[2] = database["devices"][index]
+    if index == 0:
+        query.edit_message_text("My favourite device tbh. Now the link, we are done then :) "
+                                "Use /cancel anytime to cancel.")
+    elif index == 2:
+        query.edit_message_text("Ihhh, an apple device. Now the link, we are done then :) "
+                                "Use /cancel anytime to cancel.")
+    else:
+        query.edit_message_text("I like it! Now the link, we are done then :) "
+                                "Use /cancel anytime to cancel.")
+    return LINK
 
 
 def add_link(bot, update):
+    entities = update.message.entities
+    if entities:
+        if entities[0].type == MessageEntity.URL:
+            pass
+        else:
+            update.message.reply_text("Please send me an URL, thanks :)")
+            return LINK
+    else:
+        update.message.reply_text("Please send me an URL, thanks :)")
+        return LINK
     posting_id = -1001353729458
     Globalvariables.add[3] = update.message.text
     caption = "{}\n\n#{} #gifsupport\n\n<a href=\"{}\">More help</a>".format(
@@ -649,8 +673,8 @@ def main():
         states={
             GIF: [MessageHandler(Filters.animation, add_gif_demo)],
             QUESTION: [MessageHandler(Filters.text, add_question)],
-            DEVICE: [MessageHandler(Filters.text, add_device)],
-            LINK: [MessageHandler(Filters.text & Filters.entity(MessageEntity.TEXT_LINK), add_link)],
+            DEVICE: [CallbackQueryHandler(add_device, pattern="device")],
+            LINK: [MessageHandler(Filters.text, add_link)],
             CALLBACK: [CallbackQueryHandler(queryhandler)],
             TITEL: [MessageHandler(Filters.text, add_title)],
             DESCRIPTION: [MessageHandler(Filters.text, add_description)],

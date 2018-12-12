@@ -45,5 +45,5 @@
             0
         ]
     ],
-  "devices": ["android", ""]
+  "devices": ["android", "android_x", "ios", "windows_phone", "linux", "windows", "mac", "macos_native", "web"]
 }
