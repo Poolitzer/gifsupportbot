@@ -324,7 +324,7 @@ def change(_, update):
         Globalvariables.variable = [index, 1]
         return UPDATE
     elif todo == 2:
-        query.edit_message_text("Great. Please send me the new post-id")
+        query.edit_message_text("Great. Please send me the new post-id or forward me the new post from the channel")
         Globalvariables.variable = [index, 2]
         return UPDATE
     elif todo == 4:
@@ -431,13 +431,21 @@ def pass_update(bot, update):
                          parse_mode=ParseMode.HTML)
         database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = update.message.text
     elif Globalvariables.variable[1] == 2:
+        if update.message.forward_from_message_id:
+            update.message.text = update.message.forward_from_message_id
+        else:
+            try:
+                int(update.message.text)
+            except ValueError:
+                update.message.reply_text("Please send me an ID or forward me an existing post")
+                return UPDATE
         update.message.reply_text("Changed id from {} to {}.".format(
             database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]], update.message.text))
         bot.send_message(-1001214567646, "{} changed id from {} to {}."
                          .format(mention_html(update.effective_user.id, update.effective_user.first_name),
                                  database["links"][Globalvariables.variable[0]][0], update.message.text),
                          parse_mode=ParseMode.HTML)
-        database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = update.message.text
+        database["links"][Globalvariables.variable[0]][Globalvariables.variable[1]] = int(update.message.text)
     elif Globalvariables.variable[1] == 3:
         update.message.reply_text("Changed keyword from {} to {}.".format(
             database["keywords"][Globalvariables.variable[0]][Globalvariables.variable[2]], update.message.text))
