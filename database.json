@@ -1,73 +1,49 @@
 {
-    "keywords": [
-        [
-            "delete messages",
-            "android",
-            "delete supergroup"
-        ],
-        [
-            "logout",
-            "android"
-        ]
-    ],
+    "keywords": [],
     "keywords_demo": [
         [
-            "Hmmm"
+            "Android",
+            "Logout",
+            "Pool"
         ],
         [
-            "qwerw",
-            "fqwe",
-            "fq"
+            "Logout",
+            "Android",
+            "Peanut butter jelly time!",
+            "Telegram",
+            "Yes",
+            "Ye",
+            "Lol",
+            "Good",
+            "Why?",
+            "Why-not?",
+            "Ok",
+            "Hahaha"
         ],
         [
-            "w",
-            "w",
-            "w"
-        ],
-        [
-            "lets",
-            "test",
-            "d"
+            "Dogs",
+            "Shock",
+            "collar",
+            "Bark"
         ]
     ],
-    "links": [
-        [
-            "Del messages an",
-            "How to delete messages on android",
-            24
-        ],
-        [
-            "logout android",
-            "How to logout on android",
-            26
-        ],
-        [
-            "feq",
-            "fqe",
-            34
-        ]
-    ],
+    "links": [],
     "links_demo": [
         [
-            "Test!",
-            "This is a test",
-            5,
-            "DEMO"
+            "Android logout",
+            "How to logout on android",
+            0
         ],
         [
-            "Wuhu",
-            "Lets go",
-            5
+            "How to logout",
+            "How to logout on Android devices",
+            0
         ],
         [
-            "hmm",
-            "gqdwzu",
-            5
-        ],
-        [
-            "A new test",
-            "Testy",
-            5
+            "Dogs",
+            "Why-tho",
+            0
         ]
-    ]
+    ],
+  "devices": ["android", ""]
 }

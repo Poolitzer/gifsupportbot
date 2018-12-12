@@ -1,6 +1,6 @@
 from uuid import uuid4
 from github import Github
-from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, ParseMode
+from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, ParseMode, MessageEntity
 from telegram.ext import CommandHandler, Updater, Filters, ConversationHandler, InlineQueryHandler, \
     CallbackQueryHandler, MessageHandler
 from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
@@ -266,6 +266,13 @@ def real_vote(query, todo, user, post, update_vote, insert_voter, markup):
         query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
 
 
+def linus_is_stupid(_, update):
+    if update.message.reply_to_message:
+        update.message.reply_to_message.reply_text("EXACTLY! Thank you. Finally someone says it.")
+    else:
+        update.message.reply_text("EXACTLY! Thank you. Finally someone says it.")
+
+
 def update_db(_, update):
     temp = []
     subtemp = []
@@ -477,10 +484,19 @@ def add_question(_, update):
 
 
 def add_device(_, update):
-    Globalvariables.add[2] = update.message.text
-    update.message.reply_text("My favourite device tbh. Now the link, we are done then :) "
-                              "Use /cancel anytime to cancel.")
-    return LINK
+    for device in database["devices"]:
+        if update.message.text.lower() == device:
+            Globalvariables.add[2] = update.message.text.lower()
+            if device == "android":
+                update.message.reply_text("My favourite device tbh. Now the link, we are done then :) "
+                                          "Use /cancel anytime to cancel.")
+            elif device == "ios":
+                update.message.reply_text("Ihhh, an apple device. Now the link, we are done then :) "
+                                          "Use /cancel anytime to cancel.")
+            return LINK
+    update.message.reply_text("Sorry, you device isn't in my database. If its just a typo, send it again. If you "
+                              "believe that this is an error, ping @Poolitzer :)")
+    return DEVICE
 
 
 def add_link(bot, update):
@@ -634,7 +650,7 @@ def main():
             GIF: [MessageHandler(Filters.animation, add_gif_demo)],
             QUESTION: [MessageHandler(Filters.text, add_question)],
             DEVICE: [MessageHandler(Filters.text, add_device)],
-            LINK: [MessageHandler(Filters.text, add_link)],
+            LINK: [MessageHandler(Filters.text & Filters.entity(MessageEntity.TEXT_LINK), add_link)],
             CALLBACK: [CallbackQueryHandler(queryhandler)],
             TITEL: [MessageHandler(Filters.text, add_title)],
             DESCRIPTION: [MessageHandler(Filters.text, add_description)],
@@ -648,6 +664,7 @@ def main():
     dp.add_handler(InlineQueryHandler(demoinlinequery, pattern="demo"))
     dp.add_handler(InlineQueryHandler(inlinequery))
     dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, new_member))
+    dp.add_handler(CommandHandler('LinusIsStupid', linus_is_stupid))
     updater.bot.send_message(-1001214567646, "Not Linus bot online")
     updater.start_polling()
 
