@@ -125,10 +125,11 @@ def markup_demo_creator(post_id):
 
 def start_admin(_, update, args):
     if args:
-        args[0].split('_')
-        if args[1]:
-            Globalvariables.add = [0, 0, int(args[0]), "DEMO"]
-        else:
+        args.split('_')
+        try:
+            if args[1]:
+                Globalvariables.add = [0, 0, int(args[0]), "DEMO"]
+        except IndexError:
             Globalvariables.add = [0, 0, int(args[0])]
         update.message.reply_text("Great. lets do it then. Send me a fitting title please")
         return TITEL
