@@ -4,6 +4,7 @@ from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKe
 from telegram.ext import CommandHandler, Updater, Filters, ConversationHandler, InlineQueryHandler, \
     CallbackQueryHandler, MessageHandler
 from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
+from telegram.error import BadRequest
 from telegram.utils.helpers import mention_html
 import json
 import logging
@@ -123,6 +124,28 @@ def markup_demo_creator(post_id):
                                   InlineKeyboardButton("👎{}".format(con), callback_data="demo_vote_no")]])
 
 
+def query_answer_creator(post_id):
+    pro = 0
+    con = 0
+    for voter in Database.db.posts.find_one({"post_id": post_id})["voters"]:
+        if voter["voted"] == 1:
+            pro += 1
+        if voter["voted"] == -1:
+            con += 1
+    return "👍 - {}\n👎 - {} \n\n Counters in the post will be updated soon".format(pro, con)
+
+
+def query_answer_demo_creator(post_id):
+    pro = 0
+    con = 0
+    for voter in Database.db.demo_posts.find_one({"post_id": post_id})["voters"]:
+        if voter["voted"] == 1:
+            pro += 1
+        if voter["voted"] == -1:
+            con += 1
+    return "👍 - {}\n👎 - {} \n\n Counters in the post will be updated soon".format(pro, con)
+
+
 def start_admin(bot, update, args):
     if args:
         args.split('_')
@@ -211,7 +234,7 @@ def demoinlinequery(_, update):
         update.inline_query.answer(results)
 
 
-def vote(_, update):
+def vote(_, update, job_queue):
     query = update.callback_query
     todo = query.data[-2:len(query.data)]
     user = query.from_user
@@ -219,10 +242,10 @@ def vote(_, update):
     update_vote = Database.update_vote
     insert_vote = Database.insert_voter
     markup = markup_creator
-    return real_vote(query, todo, user, post, update_vote, insert_vote, markup)
+    return real_vote(query, todo, user, post, update_vote, insert_vote, markup, job_queue)
 
 
-def demovote(_, update):
+def demovote(_, update, job_queue):
     query = update.callback_query
     todo = query.data[-2:len(query.data)]
     user = query.from_user
@@ -230,42 +253,73 @@ def demovote(_, update):
     update_vote = Database.update_demo_vote
     insert_vote = Database.insert_demo_voter
     markup = markup_demo_creator
-    return real_vote(query, todo, user, post, update_vote, insert_vote, markup)
+    return real_vote(query, todo, user, post, update_vote, insert_vote, markup, job_queue)
 
 
-def real_vote(query, todo, user, post, update_vote, insert_voter, markup):
+def real_vote(query, todo, user, post, update_vote, insert_voter, markup, job):
     for voter in post["voters"]:
         if voter["id"] == user.id:
             if todo == "no":
                 if voter["voted"] == -1:
                     update_vote(query.message.message_id, user.id, 0)
-                    query.answer("You took your vote back")
-                    query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
+                    if job.jobs():
+                        query.answer("You took your vote back.\n" + query_answer_demo_creator(query.message.message_id),
+                                     show_alert=True)
+                    else:
+                        query.answer("You took your vote back. Posts will be updated soon")
+                        job.run_once(update_reply_markup, 5, context=[query.message, markup])
                     return
                 else:
                     update_vote(query.message.message_id, user.id, -1)
-                    query.answer("You voted against it")
-                    query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
+                    if job.jobs():
+                        query.answer("You voted against it.\n" + query_answer_demo_creator(query.message.message_id),
+                                     show_alert=True)
+                    else:
+                        query.answer("You voted against it. Posts will be updated soon")
+                        job.run_once(update_reply_markup, 5, context=[query.message, markup])
                     return
             else:
                 if voter["voted"] == 1:
                     update_vote(query.message.message_id, user.id, 0)
-                    query.answer("You took your vote back")
-                    query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
+                    if job.jobs():
+                        query.answer("You took your vote back.\n" + query_answer_demo_creator(query.message.message_id),
+                                     show_alert=True)
+                    else:
+                        query.answer("You took your vote back. Posts will be updated soon")
+                        job.run_once(update_reply_markup, 5, context=[query.message, markup])
                     return
                 else:
                     update_vote(query.message.message_id, user.id, 1)
-                    query.answer("You voted in favour of it")
-                    query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
+                    if job.jobs():
+                        query.answer("You voted in favour of it.\n" +
+                                     query_answer_demo_creator(query.message.message_id), show_alert=True)
+                    else:
+                        query.answer("You voted in favour of it. Posts will be updated soon")
+                        job.run_once(update_reply_markup, 5, context=[query.message, markup])
                     return
     if todo == "no":
         insert_voter(query.message.message_id, vars(Voter(user.id, user.mention_html(), user.language_code, -1)))
-        query.answer("You voted against it")
+        if job.jobs():
+            pass
+        else:
+            job.run_once(update_reply_markup, 5, context=[query.message, markup])
+        query.answer("You voted against it. Posts will be updated soon")
         query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
     else:
         insert_voter(query.message.message_id, vars(Voter(user.id, user.mention_html(), user.language_code, 1)))
-        query.answer("You voted in favour of it")
+        if job.jobs():
+            pass
+        else:
+            job.run_once(update_reply_markup, 5, context=[query.message, markup])
+        query.answer("You voted in favour of it. Posts will be updated soon")
         query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
+
+
+def update_reply_markup(bot, job):
+    try:
+        job.context[0].edit_reply_markup(reply_markup=job.context[1](job.context[0].message_id))
+    except BadRequest:
+        pass
 
 
 def linus_is_stupid(_, update):
@@ -713,8 +767,8 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)],
     )
     dp.add_handler(conv_add_handler)
-    dp.add_handler(CallbackQueryHandler(vote, pattern="vote"))
-    dp.add_handler(CallbackQueryHandler(demovote, pattern="demo"))
+    dp.add_handler(CallbackQueryHandler(vote, pattern="vote", pass_job_queue=True))
+    dp.add_handler(CallbackQueryHandler(demovote, pattern="demo", pass_job_queue=True))
     dp.add_handler(InlineQueryHandler(demoinlinequery, pattern="demo"))
     dp.add_handler(InlineQueryHandler(inlinequery))
     dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, new_member))
