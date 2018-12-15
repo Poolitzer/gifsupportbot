@@ -1,8 +1,9 @@
 from uuid import uuid4
 from github import Github
-from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, ParseMode, MessageEntity
-from telegram.ext import CommandHandler, Updater, Filters, ConversationHandler, InlineQueryHandler, \
-    CallbackQueryHandler, MessageHandler
+from telegram import (InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, ParseMode, MessageEntity,
+                      ReplyKeyboardMarkup, ReplyKeyboardRemove)
+from telegram.ext import (CommandHandler, Updater, Filters, ConversationHandler, InlineQueryHandler,
+                          CallbackQueryHandler, MessageHandler)
 from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
 from telegram.error import BadRequest
 from telegram.utils.helpers import mention_html
@@ -17,7 +18,8 @@ logging.basicConfig(filename="log.log", format='%(asctime)s - %(first_name)s - %
 database = json.load(open('./database.json'))
 tokenbase = json.load(open('./tokens.json'))
 
-ENTRY, CHANGEWHAT, UPDATE, CHANGE, TITEL, DESCRIPTION, KEYWORDS, QUESTION, DEVICE, LINK, CALLBACK, GIF = range(12)
+(ENTRY, CHANGEWHAT, UPDATE, CHANGE, TITEL, DESCRIPTION, KEYWORDS, QUESTION, DEVICE, LINK, CALLBACK, GIF, POSITION,
+ DEVICES) = range(14)
 
 g = Github(tokenbase["GITHUBTOKEN"])
 
@@ -54,6 +56,14 @@ class Database:
         temp.append(voter)
         self.db.demo_posts.update_one({"post_id": post_id}, {"$set": {'voters': temp}})
 
+    def insert_user(self, user):
+        temp = self.db.users.find_one({"id": user["id"]})
+        if temp:
+            self.db.users.update_one({"id": user["id"]}, {"$set": {'positions': user["positions"]}})
+            self.db.users.update_one({"id": user["id"]}, {"$set": {'devices': []}})
+        else:
+            self.db.users.insert_one(user)
+
     def update_vote(self, post_id, voter_id, votes):
         temp = self.db.posts.find_one({"post_id": post_id})['voters']
         for voter in temp:
@@ -68,13 +78,19 @@ class Database:
                 voter["voted"] = votes
         self.db.demo_posts.update_one({"post_id": post_id}, {"$set": {'voters': temp}})
 
+    def insert_device(self, user_id, device):
+        temp = self.db.users.find_one({"id": user_id})["devices"]
+        temp.append(device)
+        self.db.users.update_one({"id": user_id}, {"$set": {'devices': temp}})
+
 
 Database = Database()
 
 
-class Post:
+class Gif:
 
-    def __init__(self, post_id):
+    def __init__(self, file_id, post_id=0):
+        self.file_id = file_id
         self.post_id = post_id
         self.voters = []
 
@@ -88,79 +104,174 @@ class Voter:
         self.voted = voted
 
 
-def text_creator(index):
-    text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)" \
-        .format(database["links"][index][2], database["links"][index][0])
-    return InputTextMessageContent(text, ParseMode.HTML)
+class User:
+
+    def __init__(self, user_id, mention, positions):
+        self.id = user_id
+        self.mention = mention
+        self.positions = positions
+        self.devices = []
+        self.gifs = []
 
 
-def text_creator_demo(index):
-    text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)" \
-        .format(database["links_demo"][index][2], database["links_demo"][index][0])
-    return InputTextMessageContent(text, ParseMode.HTML)
+class Helpers:
+
+    @staticmethod
+    def text_creator(index):
+        text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)" \
+            .format(database["links"][index][2], database["links"][index][0])
+        return InputTextMessageContent(text, ParseMode.HTML)
+
+    @staticmethod
+    def text_creator_demo(index):
+        text = "<a href=\"https://t.me/gifsupport/{}\">{}</a> :)" \
+            .format(database["links_demo"][index][2], database["links_demo"][index][0])
+        return InputTextMessageContent(text, ParseMode.HTML)
+
+    @staticmethod
+    def markup_creator(post_id):
+        pro = 0
+        con = 0
+        for voter in Database.db.posts.find_one({"post_id": post_id})["voters"]:
+            if voter["voted"] == 1:
+                pro += 1
+            if voter["voted"] == -1:
+                con += 1
+        return InlineKeyboardMarkup([[InlineKeyboardButton("👍{}".format(pro), callback_data="vote_yes"),
+                                      InlineKeyboardButton("👎{}".format(con), callback_data="vote_no")]])
+
+    @staticmethod
+    def markup_demo_creator(post_id):
+        pro = 0
+        con = 0
+        for voter in Database.db.demo_posts.find_one({"post_id": post_id})["voters"]:
+            if voter["voted"] == 1:
+                pro += 1
+            if voter["voted"] == -1:
+                con += 1
+        return InlineKeyboardMarkup([[InlineKeyboardButton("👍{}".format(pro), callback_data="demo_vote_yes"),
+                                      InlineKeyboardButton("👎{}".format(con), callback_data="demo_vote_no")]])
+
+    @staticmethod
+    def query_answer_creator(post_id):
+        pro = 0
+        con = 0
+        for voter in Database.db.posts.find_one({"post_id": post_id})["voters"]:
+            if voter["voted"] == 1:
+                pro += 1
+            if voter["voted"] == -1:
+                con += 1
+        return "👍 - {}\n👎 - {} \n\n Counters in the post will be updated soon".format(pro, con)
+
+    @staticmethod
+    def query_answer_demo_creator(post_id):
+        pro = 0
+        con = 0
+        for voter in Database.db.demo_posts.find_one({"post_id": post_id})["voters"]:
+            if voter["voted"] == 1:
+                pro += 1
+            if voter["voted"] == -1:
+                con += 1
+        return "👍 - {}\n👎 - {} \n\n Counters in the post will be updated soon".format(pro, con)
+
+    @staticmethod
+    def device_buttons():
+        temp = []
+        subtemp = []
+        x = 0
+        for index, device in enumerate(database["devices"]):
+            subtemp.append(InlineKeyboardButton(device, callback_data="device{}".format(index)))
+            x += 1
+            if x is 2:
+                temp.append(subtemp)
+                subtemp = []
+                x = 0
+            elif device is database["devices"][-1] and x is 1:
+                temp.append(subtemp)
+        return temp
+
+    @staticmethod
+    def device_buttons_remove(remove):
+        temp = []
+        subtemp = []
+        x = 0
+        for index, device in enumerate(database["devices"]):
+            not_skip = False
+            for get_deleted in remove:
+                if device == get_deleted:
+                    not_skip = True
+                    break
+            if not_skip:
+                pass
+            else:
+                subtemp.append(InlineKeyboardButton(device, callback_data="device{}".format(index)))
+                x += 1
+                if x is 2:
+                    temp.append(subtemp)
+                    subtemp = []
+                    x = 0
+                elif device is database["devices"][-1] and x is 1:
+                    temp.append(subtemp)
+        return temp
 
 
-def markup_creator(post_id):
-    pro = 0
-    con = 0
-    for voter in Database.db.posts.find_one({"post_id": post_id})["voters"]:
-        if voter["voted"] == 1:
-            pro += 1
-        if voter["voted"] == -1:
-            con += 1
-    return InlineKeyboardMarkup([[InlineKeyboardButton("👍{}".format(pro), callback_data="vote_yes"),
-                                  InlineKeyboardButton("👎{}".format(con), callback_data="vote_no")]])
+Helpers = Helpers()
 
 
-def markup_demo_creator(post_id):
-    pro = 0
-    con = 0
-    for voter in Database.db.demo_posts.find_one({"post_id": post_id})["voters"]:
-        if voter["voted"] == 1:
-            pro += 1
-        if voter["voted"] == -1:
-            con += 1
-    return InlineKeyboardMarkup([[InlineKeyboardButton("👍{}".format(pro), callback_data="demo_vote_yes"),
-                                  InlineKeyboardButton("👎{}".format(con), callback_data="demo_vote_no")]])
+def start_admin(_, update):
+    button = [["Video recording"], ["Video editing"], ["Channel managing"], ["Video recording + editing"],
+              ["Video recording + Channel managing"], ["Video editing + Channel managing"], ["GIVE ME ALL OF IT!"]]
+    update.message.reply_text("Hey. Great that you want to contribute to this project. "
+                              "Please choose what you want to do.",
+                              reply_markup=ReplyKeyboardMarkup(button, one_time_keyboard=True, resize_keyboard=True))
+    return POSITION
 
 
-def query_answer_creator(post_id):
-    pro = 0
-    con = 0
-    for voter in Database.db.posts.find_one({"post_id": post_id})["voters"]:
-        if voter["voted"] == 1:
-            pro += 1
-        if voter["voted"] == -1:
-            con += 1
-    return "👍 - {}\n👎 - {} \n\n Counters in the post will be updated soon".format(pro, con)
-
-
-def query_answer_demo_creator(post_id):
-    pro = 0
-    con = 0
-    for voter in Database.db.demo_posts.find_one({"post_id": post_id})["voters"]:
-        if voter["voted"] == 1:
-            pro += 1
-        if voter["voted"] == -1:
-            con += 1
-    return "👍 - {}\n👎 - {} \n\n Counters in the post will be updated soon".format(pro, con)
-
-
-def start_admin(bot, update, args):
-    if args:
-        args.split('_')
-        try:
-            if args[2]:
-                Globalvariables.add = [0, 0, int(args[0]), "DEMO"]
-        except IndexError:
-            Globalvariables.add = [0, 0, int(args[0])]
-        bot.delete_message(1001374913393, int(args[1]))
-        update.message.reply_text("Great. lets do it then. Send me a fitting title please")
-        return TITEL
+def add_position(_, update):
+    text = update.message.text
+    user_id = update.effective_user.id
+    mention = str(update.effective_user.mention_html)
+    devices = True
+    if text == "Video recording":
+        Database.insert_user(vars(User(user_id, mention, ["recording"])))
+    elif text == "Video editing":
+        Database.insert_user(vars(User(user_id, mention, ["editing"])))
+        devices = False
+    elif text == "Channel managing":
+        Database.insert_user(vars(User(user_id, mention, ["managing"])))
+        devices = False
+    elif text == "Video recording + editing":
+        Database.insert_user(vars(User(user_id, mention, ["recording", "editing"])))
+    elif text == "Video recording + Channel managing":
+        Database.insert_user(vars(User(user_id, mention, ["recording", "managing"])))
+    elif text == "Video editing + Channel managing":
+        Database.insert_user(vars(User(user_id, mention, ["editing", "managing"])))
+        devices = False
     else:
-        update.message.reply_text('Hi! Run /update to update an existing GIF, forward me one from the channel to add it'
-                                  " and don't forget that you can use /cancel almost every time.")
+        Database.insert_user(vars(User(user_id, mention, ["recording", "editing", "managing"])))
+    if devices:
+        # TODO Database.db.users.update_one({"id": update.effective_user.id}, {"$set": {'devices': []}})
+        update.message.reply_text("Great. Please tell me which devices you want to record for.",
+                                  reply_markup=InlineKeyboardMarkup(Helpers.device_buttons()))
+        return DEVICES
+    else:
+        update.message.reply_text("Great. I will notfiy you now to your positions", reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
+
+
+def user_device(_, update):
+    query = update.callback_query
+    index = int(query.data[-1])
+    Database.insert_device(update.effective_user.id, database["devices"][index])
+    known = Database.db.users.find_one({"id": update.effective_user.id})["devices"]
+    query.edit_message_text("Want to add another one? Cool. Else, send /finish.",
+                            reply_markup=InlineKeyboardMarkup(Helpers.device_buttons_remove(known)))
+    return DEVICES
+
+
+def finish2(_, update):
+    update.message.reply_text("Cool. Got your devices. Want to add a GIF right now? Send /add.")
+    return ConversationHandler.END
 
 
 def new_member(_, update):
@@ -192,7 +303,7 @@ def inlinequery(_, update):
                 results.append(InlineQueryResultArticle(
                     id=uuid4(),
                     title=database["links"][index][0],
-                    input_message_content=text_creator(index),
+                    input_message_content=Helpers.text_creator(index),
                     description=database["links"][index][1]
                 ))
                 amount += 1
@@ -219,7 +330,7 @@ def demoinlinequery(_, update):
                 results.append(InlineQueryResultArticle(
                     id=uuid4(),
                     title=database["links_demo"][index][0],
-                    input_message_content=text_creator_demo(index),
+                    input_message_content=Helpers.text_creator_demo(index),
                     description=database["links_demo"][index][1]
                 ))
                 amount += 1
@@ -241,7 +352,7 @@ def vote(_, update, job_queue):
     post = Database.db.posts.find_one({"post_id": query.message.message_id})
     update_vote = Database.update_vote
     insert_vote = Database.insert_voter
-    markup = markup_creator
+    markup = Helpers.markup_creator
     return real_vote(query, todo, user, post, update_vote, insert_vote, markup, job_queue)
 
 
@@ -252,7 +363,7 @@ def demovote(_, update, job_queue):
     post = Database.db.demo_posts.find_one({"post_id": query.message.message_id})
     update_vote = Database.update_demo_vote
     insert_vote = Database.insert_demo_voter
-    markup = markup_demo_creator
+    markup = Helpers.markup_demo_creator
     return real_vote(query, todo, user, post, update_vote, insert_vote, markup, job_queue)
 
 
@@ -263,8 +374,8 @@ def real_vote(query, todo, user, post, update_vote, insert_voter, markup, job):
                 if voter["voted"] == -1:
                     update_vote(query.message.message_id, user.id, 0)
                     if job.jobs():
-                        query.answer("You took your vote back.\n" + query_answer_demo_creator(query.message.message_id),
-                                     show_alert=True)
+                        query.answer("You took your vote back.\n" +
+                                     Helpers.query_answer_demo_creator(query.message.message_id), show_alert=True)
                     else:
                         query.answer("You took your vote back. Posts will be updated soon")
                         job.run_once(update_reply_markup, 5, context=[query.message, markup])
@@ -272,8 +383,8 @@ def real_vote(query, todo, user, post, update_vote, insert_voter, markup, job):
                 else:
                     update_vote(query.message.message_id, user.id, -1)
                     if job.jobs():
-                        query.answer("You voted against it.\n" + query_answer_demo_creator(query.message.message_id),
-                                     show_alert=True)
+                        query.answer("You voted against it.\n" +
+                                     Helpers.query_answer_demo_creator(query.message.message_id), show_alert=True)
                     else:
                         query.answer("You voted against it. Posts will be updated soon")
                         job.run_once(update_reply_markup, 5, context=[query.message, markup])
@@ -282,8 +393,8 @@ def real_vote(query, todo, user, post, update_vote, insert_voter, markup, job):
                 if voter["voted"] == 1:
                     update_vote(query.message.message_id, user.id, 0)
                     if job.jobs():
-                        query.answer("You took your vote back.\n" + query_answer_demo_creator(query.message.message_id),
-                                     show_alert=True)
+                        query.answer("You took your vote back.\n" +
+                                     Helpers.query_answer_demo_creator(query.message.message_id), show_alert=True)
                     else:
                         query.answer("You took your vote back. Posts will be updated soon")
                         job.run_once(update_reply_markup, 5, context=[query.message, markup])
@@ -292,7 +403,7 @@ def real_vote(query, todo, user, post, update_vote, insert_voter, markup, job):
                     update_vote(query.message.message_id, user.id, 1)
                     if job.jobs():
                         query.answer("You voted in favour of it.\n" +
-                                     query_answer_demo_creator(query.message.message_id), show_alert=True)
+                                     Helpers.query_answer_demo_creator(query.message.message_id), show_alert=True)
                     else:
                         query.answer("You voted in favour of it. Posts will be updated soon")
                         job.run_once(update_reply_markup, 5, context=[query.message, markup])
@@ -554,26 +665,13 @@ def add_db(_, update):
 
 def add_question(_, update):
     Globalvariables.add[1] = update.message.text
-    temp = []
-    subtemp = []
-    x = 0
-    for index, device in enumerate(database["devices"]):
-        subtemp.append(InlineKeyboardButton(device, callback_data="device{}".format(index)))
-        x += 1
-        if x is 2:
-            temp.append(subtemp)
-            subtemp = []
-            x = 0
-        elif device is database["devices"][-1] and x is 1:
-            temp.append(subtemp)
     update.message.reply_text("Got the Question. Now choose a device please :) Use /cancel anytime to cancel.",
-                              reply_markup=InlineKeyboardMarkup(temp))
+                              reply_markup=InlineKeyboardMarkup(Helpers.device_buttons()))
     return DEVICE
 
 
 def add_device(_, update):
     query = update.callback_query
-    print(update.callback_query.data)
     index = int(query.data[-1])
     Globalvariables.add[2] = database["devices"][index]
     if index == 0:
@@ -624,11 +722,11 @@ def add_link(bot, update):
         if Globalvariables.add[3]:
             Globalvariables.add = [0, 0, 0, "DEMO"]
             Globalvariables.add[2] = message.message_id
-            Database.insert_demo_posts(vars(Post(message.message_id)))
+            Database.insert_demo_posts(vars(Gif(message.message_id)))
     except IndexError:
         Globalvariables.add = [0, 0, 0]
         Globalvariables.add[2] = message.message_id
-        Database.insert_posts(vars(Post(message.message_id)))
+        Database.insert_posts(vars(Gif(message.message_id)))
     return CALLBACK
 
 
@@ -751,7 +849,6 @@ def main():
     dp.add_handler(conv_update_handler)
     conv_add_handler = ConversationHandler(
         entry_points=[MessageHandler(Filters.user(tokenbase["ADMINS"]) & Filters.animation, add_db),
-                      CommandHandler("start", start_admin, filters=Filters.user(tokenbase["ADMINS"]), pass_args=True),
                       CommandHandler("demo", add_db_demo, filters=Filters.user(tokenbase["ADMINS"])),
                       MessageHandler(Filters.user(tokenbase["ADMINS"]) & Filters.forwarded, add_db)],
         states={
@@ -767,13 +864,23 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)],
     )
     dp.add_handler(conv_add_handler)
+    conv_add_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start_admin,
+                                     filters=Filters.user(tokenbase["ADMINS"]) & Filters.private)],
+        states={
+            POSITION: [MessageHandler(Filters.text, add_position)],
+            DEVICES: [CallbackQueryHandler(user_device, pattern="device"), CommandHandler('finish', finish2)]
+        },
+        fallbacks=[CommandHandler('cancel', cancel)],
+    )
+    dp.add_handler(conv_add_handler)
     dp.add_handler(CallbackQueryHandler(vote, pattern="vote", pass_job_queue=True))
     dp.add_handler(CallbackQueryHandler(demovote, pattern="demo", pass_job_queue=True))
     dp.add_handler(InlineQueryHandler(demoinlinequery, pattern="demo"))
     dp.add_handler(InlineQueryHandler(inlinequery))
     dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, new_member))
     dp.add_handler(CommandHandler('LinusIsStupid', linus_is_stupid))
-    updater.bot.send_message(-1001214567646, "Not Linus bot online")
+    updater.bot.send_message(-1001214567646, "Not Linus bot online", disable_notification=True)
     updater.start_polling()
 
 
