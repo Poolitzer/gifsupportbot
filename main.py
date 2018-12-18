@@ -87,12 +87,20 @@ class Database:
 Database = Database()
 
 
-class Gif:
+class Post:
 
-    def __init__(self, file_id, post_id=0):
-        self.file_id = file_id
+    def __init__(self, post_id):
         self.post_id = post_id
         self.voters = []
+
+
+class Gif:
+
+    def __init__(self, title, file_id):
+        self.title = title
+        self.file_id = file_id
+        self.devices = database["devices"]
+        self.people = []
 
 
 class Voter:
@@ -311,7 +319,7 @@ def inlinequery(_, update):
                     update.inline_query.answer(results)
                     break
                 else:
-                    break
+                    pass
             else:
                 pass
     if amount <= 4:
@@ -488,11 +496,9 @@ def change(_, update):
     elif todo == 1:
         query.edit_message_text("Great. Please send me the new description")
         Globalvariables.variable = [index, 1]
-        return UPDATE
     elif todo == 2:
         query.edit_message_text("Great. Please send me the new post-id or forward me the new post from the channel")
         Globalvariables.variable = [index, 2]
-        return UPDATE
     elif todo == 4:
         temp = []
         subtemp = []
@@ -512,12 +518,11 @@ def change(_, update):
             query.data[5:len(query.data) - 1]))])
         query.edit_message_text("So, you want to change/delete a keyword or add a new one?",
                                 reply_markup=InlineKeyboardMarkup(temp))
-        return UPDATE
     else:
         buttons = [[InlineKeyboardButton("Delete", callback_data="delete{}yes".format(query.data[5:len(query.data)])),
                     InlineKeyboardButton("Cancel", callback_data="delete{}no".format(query.data[5:len(query.data)]))]]
         query.edit_message_text("Are you sure?", reply_markup=InlineKeyboardMarkup(buttons))
-        return UPDATE
+    return UPDATE
 
 
 def change_keyword(_, update):
@@ -647,27 +652,49 @@ def add_gif_demo(_, update):
 
 
 def add_db(_, update):
-    if update.message.forward_from_chat.id == -1001353729458:
-        skip = False
-        for post in database["links"]:
-            if post[2] == update.message.forward_from_message_id:
-                skip = True
-                update.message.reply_text("Haha, funny. Please forward me a new post from the botsupport channel smh")
-                return ConversationHandler.END
-        if not skip:
-            Globalvariables.add = [0, 0, update.message.forward_from_message_id]
-            update.message.reply_text("Nice, a new post. Please send its titel :) Use /cancel anytime to cancel.")
-            return TITEL
-    Globalvariables.add = [update.message.animation.file_id, "Title", "Device", "link"]
-    update.message.reply_text("Great, a new GIF. Please send its question :) Use /cancel anytime to cancel.")
-    return QUESTION
+    temp = []
+    subtemp = []
+    x = 0
+    user_devices = Database.db.users.find_one({"id": update.effective_user.id})["devices"]
+    for device in user_devices:
+        subtemp.append(InlineKeyboardButton(device, callback_data="device{}".format(device)))
+        x += 1
+        if x is 2:
+            temp.append(subtemp)
+            subtemp = []
+            x = 0
+        elif device is user_devices[-1] and x is 1:
+            temp.append(subtemp)
+    update.message.reply_text("Great, a new GIF. For which device would you like to record?",
+                              reply_markup=InlineKeyboardMarkup(temp))
+    return DEVICE
 
 
 def add_question(_, update):
+    query = update.callback_query
+    device = query.data[5:len(query.data)]
+    temp = []
+    subtemp = []
+    x = 0
+    amount = 0
+    for gif in Database.db.gifs.find():
+        for devices in gif["device"]:
+            if devices == device:
+                subtemp.append(InlineKeyboardButton(gif["titel"], callback_data="gif{}".format(device)))
+                x += 1
+                amount += 1
+                if x is 2:
+                    temp.append(subtemp)
+                    subtemp = []
+                    x = 0
+            if amount == 10:
+                break
+    if subtemp:
+        temp.append(subtemp)
     Globalvariables.add[1] = update.message.text
     update.message.reply_text("Got the Question. Now choose a device please :) Use /cancel anytime to cancel.",
                               reply_markup=InlineKeyboardMarkup(Helpers.device_buttons()))
-    return DEVICE
+    return QUESTION
 
 
 def add_device(_, update):
@@ -722,11 +749,11 @@ def add_link(bot, update):
         if Globalvariables.add[3]:
             Globalvariables.add = [0, 0, 0, "DEMO"]
             Globalvariables.add[2] = message.message_id
-            Database.insert_demo_posts(vars(Gif(message.message_id)))
+            Database.insert_demo_posts(vars(Post(message.message_id)))
     except IndexError:
         Globalvariables.add = [0, 0, 0]
         Globalvariables.add[2] = message.message_id
-        Database.insert_posts(vars(Gif(message.message_id)))
+        Database.insert_posts(vars(Post(message.message_id)))
     return CALLBACK
 
 
@@ -848,13 +875,12 @@ def main():
     )
     dp.add_handler(conv_update_handler)
     conv_add_handler = ConversationHandler(
-        entry_points=[MessageHandler(Filters.user(tokenbase["ADMINS"]) & Filters.animation, add_db),
-                      CommandHandler("demo", add_db_demo, filters=Filters.user(tokenbase["ADMINS"])),
-                      MessageHandler(Filters.user(tokenbase["ADMINS"]) & Filters.forwarded, add_db)],
+        entry_points=[CommandHandler("add", add_db, filters=Filters.user(tokenbase["ADMINS"]) & Filters.animation),
+                      CommandHandler("demo", add_db_demo, filters=Filters.user(tokenbase["ADMINS"]))],
         states={
             GIF: [MessageHandler(Filters.animation, add_gif_demo)],
-            QUESTION: [MessageHandler(Filters.text, add_question)],
             DEVICE: [CallbackQueryHandler(add_device, pattern="device")],
+            QUESTION: [CallbackQueryHandler(add_device, pattern="device")],
             LINK: [MessageHandler(Filters.text, add_link)],
             CALLBACK: [CallbackQueryHandler(queryhandler)],
             TITEL: [MessageHandler(Filters.text, add_title)],
