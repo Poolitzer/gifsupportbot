@@ -1,5 +1,19 @@
 {
-    "keywords": [],
+    "devices": {
+        "android": true,
+        "android_x": true,
+        "ios": true,
+        "macos_native": true,
+        "tdesktop": true,
+        "web": true,
+        "windows_phone": true
+    },
+    "keywords": [
+        [
+            "logout",
+            "android logout"
+        ]
+    ],
     "keywords_demo": [
         [
             "Android",
@@ -27,7 +41,13 @@
             "Bark"
         ]
     ],
-    "links": [],
+    "links": [
+        [
+            54,
+            "How to logout",
+            "Now"
+        ]
+    ],
     "links_demo": [
         [
             "Android logout",
@@ -44,6 +64,5 @@
             "Why-tho",
             0
         ]
-    ],
-  "devices": ["android", "android_x", "ios", "windows_phone", "linux", "windows", "mac", "macos_native", "web"]
+    ]
 }
