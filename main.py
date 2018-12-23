@@ -433,7 +433,7 @@ def add_raw_gif(bot, update, user_data):
     update.message.reply_text("Thanks for your submission. The editors have been informed :) Do you want to record for "
                               "another device? Else, send /finish", reply_markup=buttons)
     Helpers.notification(bot, "editing", user_data["GIF"]["device"], insert_id)
-    return DEVICE
+    return NEW_GIF
 
 
 def finish_adding(_, update):
@@ -916,7 +916,7 @@ def main():
             TITLE: [MessageHandler(Filters.text, add_title, pass_user_data=True)],
             DESCRIPTION: [MessageHandler(Filters.text, add_description, pass_user_data=True)],
             DEVICE: [CallbackQueryHandler(add_device, pattern="device", pass_user_data=True)],
-            NEW_GIF: [MessageHandler(Filters.document, add_raw_gif, pass_user_data=True)],
+            NEW_GIF: [MessageHandler(Filters.document, add_raw_gif, pass_user_data=True), CommandHandler("finish", finish_adding)],
             WHAT_DEVICE: [CallbackQueryHandler(what_device, pattern="what_device", pass_user_data=True)],
             EXISTING_GIF: [CallbackQueryHandler(what_gif, pattern="gif", pass_user_data=True)],
             NEW_EXISTING_GIF: [MessageHandler(Filters.document, new_existing_gif, pass_user_data=True)],
