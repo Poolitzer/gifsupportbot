@@ -3,7 +3,7 @@ from github import Github
 from telegram import (InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, MessageEntity, ParseMode,
                       ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (CommandHandler, Updater, Filters, ConversationHandler, InlineQueryHandler,
-                          CallbackQueryHandler, MessageHandler)
+                          CallbackQueryHandler, MessageHandler, BaseFilter)
 from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
 from telegram.error import BadRequest
 from telegram.utils.helpers import mention_html
@@ -97,6 +97,19 @@ class Database:
 
 
 Database = Database()
+
+
+class GroupFilter(BaseFilter):
+    def filter(self, message):
+        user_id = message.from_user.id
+        user = message.bot.get_chat_member(-1001374913393, user_id)
+        if user.status is "left" or user.status is "restricted" or user.status is "kicked":
+            return None
+        else:
+            return True
+
+
+group_filter = GroupFilter()
 
 
 class User:
@@ -887,7 +900,7 @@ def main():
     dp.add_handler(InlineQueryHandler(inlinequery))
     conv_add_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start_admin,
-                                     filters=Filters.user(tokenbase["ADMINS"]) & Filters.private)],
+                                     filters=group_filter & Filters.private)],
         states={
             POSITION: [MessageHandler(Filters.text, add_position, pass_user_data=True)],
             DEVICES: [CallbackQueryHandler(user_device, pattern="user_devices", pass_user_data=True),
@@ -897,7 +910,7 @@ def main():
     )
     dp.add_handler(conv_add_handler)
     conv_add_handler = ConversationHandler(
-        entry_points=[CommandHandler("add", add_db, filters=Filters.user(tokenbase["ADMINS"]))],
+        entry_points=[CommandHandler("add", add_db, filters=group_filter)],
         states={
             WHAT: [CallbackQueryHandler(add_what, pattern="what", pass_user_data=True)],
             TITLE: [MessageHandler(Filters.text, add_title, pass_user_data=True)],
@@ -917,7 +930,7 @@ def main():
     dp.add_handler(conv_add_handler)
     conv_add_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(edit_what, pattern="editing", pass_user_data=True),
-                      CommandHandler("edited", edit_instantly, filters=Filters.user(tokenbase["ADMINS"]),
+                      CommandHandler("edited", edit_instantly, filters=group_filter,
                                      pass_user_data=True)
                       ],
         states={
