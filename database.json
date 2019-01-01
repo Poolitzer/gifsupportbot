@@ -25,6 +25,15 @@
             "Number",
             "Numbers",
             "Swap"
+        ],
+        [
+            "Change",
+            "Changing",
+            "Switch",
+            "Phone",
+            "Number",
+            "Numbers",
+            "Swap"
         ]
     ],
     "keywords_demo": [
@@ -63,7 +72,14 @@
         [
             "Changing phone numbers",
             "Change phone number from old one to new one.",
-            57
+            57,
+            60
+        ],
+        [
+            "Changing phone numbers",
+            "Change phone number from old one to new one.",
+            57,
+            60
         ]
     ],
     "links_demo": [
