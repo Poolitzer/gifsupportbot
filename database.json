@@ -55,6 +55,19 @@
             "Ok",
             "Yes",
             "ok"
+        ],
+        [
+            "Change",
+            "Changing",
+            "Switch",
+            "Phone",
+            "Number",
+            "Numbers",
+            "Swap",
+            "Delete",
+            "Ok",
+            "Yes",
+            "ok"
         ]
     ],
     "keywords_demo": [
@@ -95,21 +108,32 @@
             "Change phone number from old one to new one.",
             57,
             60,
-            61
+            61,
+            62
         ],
         [
             "Changing phone numbers",
             "Change phone number from old one to new one.",
             57,
             60,
-            61
+            61,
+            62
         ],
         [
             "Changing phone numbers",
             "Change phone number from old one to new one.",
             57,
             60,
-            61
+            61,
+            62
+        ],
+        [
+            "Changing phone numbers",
+            "Change phone number from old one to new one.",
+            57,
+            60,
+            61,
+            62
         ]
     ],
     "links_demo": [
