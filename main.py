@@ -48,9 +48,9 @@ class Database:
     def add_gif_device(self, gif_id, device, file_id, user_id):
         gif_id = ObjectId(gif_id)
         self.db.gifs.update_one({"_id": gif_id}, {"$set": {'added.' + device: file_id,
-                                                           'added.' + device + "_edited": False}},
-                                {"$unset": {"devices." + device: ""}},
-                                {"$addToSet": {"people": user_id}})
+                                                           'added.' + device + "_edited": False},
+                                                  "$unset": {"devices." + device: ""},
+                                                  "$addToSet": {"people": user_id}})
 
     def start_edit(self, gif_id, device):
         self.db.gifs.update_one({"_id": ObjectId(gif_id)}, {"$set": {'added.' + device + "_edited": True}})
@@ -58,8 +58,8 @@ class Database:
     def add_gif_edited(self, gif_id, device, file_id, user_id):
         gif_id = ObjectId(gif_id)
         self.db.gifs.update_one({"_id": gif_id}, {"$set": {'added.' + device: file_id,
-                                                           'added.' + device + "_managed": False}},
-                                {"$addToSet": {"people": user_id}})
+                                                           'added.' + device + "_managed": False},
+                                                  "$addToSet": {"people": user_id}})
 
     def abort_edit(self, gif_id, device):
         self.db.gifs.update_one({"_id": ObjectId(gif_id)}, {"$set": {"added." + device + "_edited": False}})
@@ -69,8 +69,8 @@ class Database:
 
     def add_gif_managed(self, gif_id, device, user_id):
         gif_id = ObjectId(gif_id)
-        self.db.gifs.update_one({"_id": gif_id}, {"$set": {'added.' + device + "_done": True}},
-                                {"$addToSet": {"people": user_id}})
+        self.db.gifs.update_one({"_id": gif_id}, {"$set": {'added.' + device + "_done": True},
+                                                  "$addToSet": {"people": user_id}})
 
     def abort_manage(self, gif_id, device):
         self.db.gifs.update_one({"_id": ObjectId(gif_id)}, {"$set": {'added' + device + "_managed": False}})
@@ -94,6 +94,39 @@ class Database:
             if voter["id"] == voter_id:
                 voter["voted"] = votes
         self.db.demo_posts.update_one({"post_id": post_id}, {"$set": {'voters': temp}})
+
+    def get_gifs(self):
+        gifs = self.db.gifs.find()
+        to_return = []
+        for gif in gifs:
+            gif_infos = {"title": gif["title"], "description": gif["description"], "gifs": {}}
+            for device in database["devices"]:
+                if device in gif["devices"]:
+                    pass
+                else:
+                    try:
+                        if gif["added"][device + "_edited"]:
+                            try:
+                                if gif["added"][device + "_managed"]:
+                                    try:
+                                        if gif["added"][device + "_done"]:
+                                            gif_infos["gifs"][device] = "posted"
+                                    except KeyError:
+                                        gif_infos["gifs"][device] = "managing"
+                                else:
+                                    gif_infos["gifs"][device] = "managed"
+                            except KeyError:
+                                gif_infos["gifs"][device] = "edited"
+                        else:
+                            gif_infos["gifs"][device] = "recorded"
+                    except KeyError:
+                        pass
+            gif_infos["people"] = gif["people"]
+            to_return.append(gif_infos)
+        return to_return
+
+    def get_user_mention(self, user_id):
+        return self.db.users.find_one({"id": user_id})["mention"]
 
 
 Database = Database()
@@ -273,6 +306,11 @@ class Helpers:
             if voter["voted"] == -1:
                 con += 1
         return "👍 - {}\n👎 - {} \n\n Counters in the post will be updated soon".format(pro, con)
+
+    # TODO implement logging again
+    @staticmethod
+    def log_poster(bot, message):
+        bot.send_message(-1001214567646, message)
 
 
 Helpers = Helpers()
@@ -503,7 +541,7 @@ def cancel(_, update):
     return ConversationHandler.END
 
 
-def edit_what(bot, update, user_data):
+def edit_what(bot, update, user_data, job_queue):
     query = update.callback_query
     gif_id = query.data[7:31]
     device = query.data[31:len(query.data)]
@@ -524,16 +562,23 @@ def edit_what(bot, update, user_data):
         Database.start_edit(gif_id, device)
         query.message.reply_text("Have fun. You can see the file below. Don't forget the startscreen.")
         bot.send_document(update.effective_chat.id, gif["added"][device])
+        job_queue.run_once(timeout_edited, 7200, name="edited", context=[gif_id, device, update.effective_user.id])
         return EDITED
 
 
-def add_edited(bot, update, user_data):
+def add_edited(bot, update, user_data, job_queue):
     user_data["GIF_edit"]["file_id"] = update.message.document.file_id
     source = user_data["GIF_edit"]
     Database.add_gif_edited(source["id"], source["device"], source["file_id"], update.effective_user.id)
     update.message.reply_text("Thanks for editing. The channel manager have been informed :)")
+    job_queue.get_jobs_by_name("edited")[0].schedule_removal()
     Helpers.notification(bot, "managing", source["device"], source["id"])
     return ConversationHandler.END
+
+
+def timeout_edited(bot, job):
+    Database.abort_edit(job.context[0], job.context[1])
+    bot.send_message(job.context[2], "Sorry, you took too long :(")
 
 
 def edit_instantly(_, update, user_data):
@@ -611,7 +656,7 @@ def cancel_editing(_, update, user_data):
     return ConversationHandler.END
 
 
-def manage_what(bot, update, user_data):
+def manage_what(bot, update, user_data, job_queue):
     query = update.callback_query
     gif_id = query.data[8:32]
     device = query.data[32:len(query.data)]
@@ -634,9 +679,16 @@ def manage_what(bot, update, user_data):
         button = InlineKeyboardMarkup([[InlineKeyboardButton("Yes", callback_data="yes_title")]])
         query.edit_message_text("Let's get this started. The internal title is <b>{}</b>, should this be the "
                                 "title/question of the post as well? Press yes to apply it, or send me a more fitting "
-                                "one.".format(gif["title"]), reply_markup=button, parse_mode=ParseMode.HTML)
+                                "one.\n\nBtw, you only have 2 hours to finish this. No stress, but that's life for you "
+                                "now :)".format(gif["title"]), reply_markup=button, parse_mode=ParseMode.HTML)
         update.effective_message.reply_animation(gif["added"][device])
+        job_queue.run_once(timeout_managed, 7200, name="managed", context=[gif_id, device, update.effective_user.id])
         return POST_TITEL
+
+
+def timeout_managed(bot, job):
+    Database.abort_manage(job.context[0], job.context[1])
+    bot.send_message(job.context[2], "Sorry, you took too long :(")
 
 
 def new_title(_, update, user_data):
@@ -720,7 +772,7 @@ def finish_keywords(bot, update, user_data):
     gif = Database.db.gifs.find_one({"_id": ObjectId(user_data["POST"]["id"])})
     caption = "{}\n\n#{} #gifsupport\n\n<a href=\"{}\">More help</a>".format(post[0], device, source["link"])
     vote_buttons = InlineKeyboardMarkup([[InlineKeyboardButton("👍", callback_data="vote_yes"),
-                                         InlineKeyboardButton("👎", callback_data="vote_no")]])
+                                          InlineKeyboardButton("👎", callback_data="vote_no")]])
     message = bot.send_animation(posting_id, gif["added"][device], caption=caption, parse_mode=ParseMode.HTML,
                                  reply_markup=vote_buttons)
     post.append(message.message_id)
@@ -748,6 +800,22 @@ def cancel_managing(_, update, user_data):
     gif_id = user_data["POST"]["gif_id"]
     Database.abort_manage(gif_id, user_data["POST"]["device"])
     return ConversationHandler.END
+
+
+def status(_, update):
+    gifs = Database.get_gifs()
+    to_send = []
+    for gif in gifs:
+        title = f"<b>{gif['title']}</b>\n"
+        devices = "Devices:\n"
+        for device, position in gif["gifs"].items():
+            devices += f"{device}: {position}\n"
+        peoples = "<i>People who worked at this gif:</i>\n"
+        for people in gif["people"]:
+            peoples += f"{Database.get_user_mention(people)}\n"
+        final_string = f"{title}<i>Description:</i> {gif['description']}\n{devices}{peoples}"
+        to_send.append(final_string)
+    update.message.reply_html("\n\n".join(to_send))
 
 
 def vote(_, update, job_queue):
@@ -778,55 +846,55 @@ def real_vote(query, todo, user, post, update_vote, insert_voter, markup, job):
             if todo == "no":
                 if voter["voted"] == -1:
                     update_vote(query.message.message_id, user.id, 0)
-                    if job.jobs():
+                    if job.get_jobs_by_name("vote"):
                         query.answer("You took your vote back.\n" +
                                      Helpers.query_answer_demo_creator(query.message.message_id), show_alert=True)
                     else:
                         query.answer("You took your vote back. Posts will be updated soon")
-                        job.run_once(update_reply_markup, 5, context=[query.message, markup])
+                        job.run_once(update_reply_markup, 5, context=[query.message, markup], name="vote")
                     return
                 else:
                     update_vote(query.message.message_id, user.id, -1)
-                    if job.jobs():
+                    if job.get_jobs_by_name("vote"):
                         query.answer("You voted against it.\n" +
                                      Helpers.query_answer_demo_creator(query.message.message_id), show_alert=True)
                     else:
                         query.answer("You voted against it. Posts will be updated soon")
-                        job.run_once(update_reply_markup, 5, context=[query.message, markup])
+                        job.run_once(update_reply_markup, 5, context=[query.message, markup], name="vote")
                     return
             else:
                 if voter["voted"] == 1:
                     update_vote(query.message.message_id, user.id, 0)
-                    if job.jobs():
+                    if job.get_jobs_by_name("vote"):
                         query.answer("You took your vote back.\n" +
                                      Helpers.query_answer_demo_creator(query.message.message_id), show_alert=True)
                     else:
                         query.answer("You took your vote back. Posts will be updated soon")
-                        job.run_once(update_reply_markup, 5, context=[query.message, markup])
+                        job.run_once(update_reply_markup, 5, context=[query.message, markup], name="vote")
                     return
                 else:
                     update_vote(query.message.message_id, user.id, 1)
-                    if job.jobs():
+                    if job.get_jobs_by_name("vote"):
                         query.answer("You voted in favour of it.\n" +
                                      Helpers.query_answer_demo_creator(query.message.message_id), show_alert=True)
                     else:
                         query.answer("You voted in favour of it. Posts will be updated soon")
-                        job.run_once(update_reply_markup, 5, context=[query.message, markup])
+                        job.run_once(update_reply_markup, 5, context=[query.message, markup], name="vote")
                     return
     if todo == "no":
         insert_voter(query.message.message_id, vars(Voter(user.id, user.mention_html(), user.language_code, -1)))
-        if job.jobs():
+        if job.get_jobs_by_name("vote"):
             pass
         else:
-            job.run_once(update_reply_markup, 5, context=[query.message, markup])
+            job.run_once(update_reply_markup, 5, context=[query.message, markup], name="vote")
         query.answer("You voted against it. Posts will be updated soon")
         query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
     else:
         insert_voter(query.message.message_id, vars(Voter(user.id, user.mention_html(), user.language_code, 1)))
-        if job.jobs():
+        if job.get_jobs_by_name("vote"):
             pass
         else:
-            job.run_once(update_reply_markup, 5, context=[query.message, markup])
+            job.run_once(update_reply_markup, 5, context=[query.message, markup], name="vote")
         query.answer("You voted in favour of it. Posts will be updated soon")
         query.message.edit_reply_markup(reply_markup=markup(query.message.message_id))
 
@@ -916,7 +984,8 @@ def main():
             TITLE: [MessageHandler(Filters.text, add_title, pass_user_data=True)],
             DESCRIPTION: [MessageHandler(Filters.text, add_description, pass_user_data=True)],
             DEVICE: [CallbackQueryHandler(add_device, pattern="device", pass_user_data=True)],
-            NEW_GIF: [MessageHandler(Filters.document, add_raw_gif, pass_user_data=True), CommandHandler("finish", finish_adding)],
+            NEW_GIF: [MessageHandler(Filters.document, add_raw_gif, pass_user_data=True),
+                      CommandHandler("finish", finish_adding)],
             WHAT_DEVICE: [CallbackQueryHandler(what_device, pattern="what_device", pass_user_data=True)],
             EXISTING_GIF: [CallbackQueryHandler(what_gif, pattern="gif", pass_user_data=True)],
             NEW_EXISTING_GIF: [MessageHandler(Filters.document, new_existing_gif, pass_user_data=True)],
@@ -929,24 +998,28 @@ def main():
     )
     dp.add_handler(conv_add_handler)
     conv_add_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(edit_what, pattern="editing", pass_user_data=True),
-                      CommandHandler("edited", edit_instantly, filters=group_filter,
-                                     pass_user_data=True)
-                      ],
+        entry_points=[CallbackQueryHandler(edit_what, pattern="editing", pass_user_data=True, pass_job_queue=True)],
         states={
-            EDITED: [MessageHandler(Filters.animation, add_edited, pass_user_data=True)],
+            EDITED: [MessageHandler(Filters.animation, add_edited, pass_user_data=True, pass_job_queue=True)]
+        },
+        fallbacks=[CommandHandler('cancel', cancel_editing, pass_user_data=True)], conversation_timeout=7200
+    )
+    dp.add_handler(conv_add_handler)
+    conv_add_handler = ConversationHandler(
+        entry_points=[CommandHandler("edited", edit_instantly, filters=group_filter,
+                                     pass_user_data=True)],
+        states={
             EDIT_TITLE: [MessageHandler(Filters.text, edit_add_title, pass_user_data=True)],
             EDIT_DESCRIPTION: [MessageHandler(Filters.text, edit_add_description, pass_user_data=True)],
             EDIT_NEW_DEVICE: [CallbackQueryHandler(edit_user_device, pattern="user_devices", pass_user_data=True),
                               CommandHandler('finish', edit_finish_devices, pass_user_data=True)],
             EDIT_DEVICE: [CallbackQueryHandler(edit_add_device, pattern="edit_device", pass_user_data=True)],
-            EDITED_NEW: [MessageHandler(Filters.animation, add_edited_directly, pass_user_data=True)]
-        },
+            EDITED_NEW: [MessageHandler(Filters.animation, add_edited_directly, pass_user_data=True)]},
         fallbacks=[CommandHandler('cancel', cancel_editing, pass_user_data=True)],
     )
     dp.add_handler(conv_add_handler)
     conv_add_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(manage_what, pattern="managing", pass_user_data=True)],
+        entry_points=[CallbackQueryHandler(manage_what, pattern="managing", pass_user_data=True, pass_job_queue=True)],
         states={
             POST_TITEL: [MessageHandler(Filters.text, new_title, pass_user_data=True),
                          CallbackQueryHandler(skip_title, pattern="yes_title", pass_user_data=True)],
@@ -956,9 +1029,10 @@ def main():
             KEYWORDS: [MessageHandler(Filters.text, add_keyword, pass_user_data=True),
                        CommandHandler('finish', finish_keywords, pass_user_data=True)]
         },
-        fallbacks=[CommandHandler('cancel', cancel_managing, pass_user_data=True)],
+        fallbacks=[CommandHandler('cancel', cancel_managing, pass_user_data=True)], conversation_timeout=7200
     )
     dp.add_handler(conv_add_handler)
+    dp.add_handler(CommandHandler("status", status))
     updater.bot.send_message(-1001214567646, "Not Linus bot online", disable_notification=True)
     updater.start_polling()
 
