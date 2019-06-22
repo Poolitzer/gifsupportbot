@@ -5,3 +5,8 @@ tokens.json
 venv
 .idea
 *.pyc
+
+# test bot stuff
+pickle_file
+job_tuples.pickle
+log.log

@@ -1,0 +1,2 @@
+telegraphtoken = ""
+bottoken = ""
