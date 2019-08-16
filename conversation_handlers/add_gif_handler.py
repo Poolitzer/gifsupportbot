@@ -90,7 +90,7 @@ def add_gif(update, context):
     button = [[InlineKeyboardButton("I want to edit",
                                     url=f"https://telegram.me/gifsupportbot?start=edit_{gif_id}_{message_id}")]]
     context.bot.edit_message_reply_markup(RECORDED_CHANNEL_ID, message_id, reply_markup=InlineKeyboardMarkup(button))
-    context.job_queue.run_repeating(bump_recorded, 2 * 60 * 60, name=gif_id, context=message_id)
+    context.job_queue.run_repeating(bump_recorded, BUMP_SECONDS, name=gif_id, context=message_id)
     utils.log_action(context, update.effective_user.first_name, update.effective_user.id, recorded_gif_id=gif_id,
                      file_id=file_id)
     # end conversation

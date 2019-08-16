@@ -1,7 +1,7 @@
 from telegram import (InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup,
                       ReplyKeyboardRemove, ParseMode, MessageEntity, ChatAction)
 from telegram.utils.helpers import mention_html
-from constants import EDITED_CHANNEL_ID, CATEGORIES, RECORDED_CHANNEL_ID, POST_CHANNEL_ID
+from constants import EDITED_CHANNEL_ID, CATEGORIES, RECORDED_CHANNEL_ID, POST_CHANNEL_ID, BUMP_SECONDS
 import utils
 from job_handlers.bump_timer import bump_edited, bump_recorded
 from database import database
@@ -254,7 +254,7 @@ def notify_editor(update, context):
         button = [[InlineKeyboardButton("I want to edit!", url=f"https://telegram.me/gifsupportbot?start=edit_"
                                                                f"{gif_id}_{message_id}")]]
         context.bot.edit_message_reply_markup(RECORDED_CHANNEL_ID, message_id, reply_markup=button)
-    context.job_queue.run_repeating(bump_recorded, 2 * 60 * 60, name=gif_id, context=message.message_id)
+    context.job_queue.run_repeating(bump_recorded, BUMP_SECONDS, name=gif_id, context=message.message_id)
     # end conversation
     return -1
 
@@ -295,7 +295,7 @@ def two_hours_timer(context):
                                     f"{data['gif_id']}_{data['message_id']}")]]
     context.bot.edit_message_caption(EDITED_CHANNEL_ID, data["message_id"], caption="",
                                      reply_markup=InlineKeyboardMarkup(button))
-    context.job_queue.run_repeating(bump_edited, 2 * 60 * 60, name=data["gif_id"], context=data["message_id"])
+    context.job_queue.run_repeating(bump_edited, BUMP_SECONDS, name=data["gif_id"], context=data["message_id"])
 
 
 def cancel(update, context):
@@ -305,7 +305,7 @@ def cancel(update, context):
                                     f"{data['gif_id']}_{data['message_id']}")]]
     context.bot.edit_message_caption(EDITED_CHANNEL_ID, data["message_id"], caption="",
                                      reply_markup=InlineKeyboardMarkup(button))
-    context.job_queue.run_repeating(bump_edited, 2 * 60 * 60, name=data["gif_id"], context=data["message_id"])
+    context.job_queue.run_repeating(bump_edited, BUMP_SECONDS, name=data["gif_id"], context=data["message_id"])
     name = "managed" + str(user_id)
     for job in context.job_queue.get_jobs_by_name(name):
         job.schedule_removal()

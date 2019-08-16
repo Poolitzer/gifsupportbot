@@ -27,3 +27,4 @@ ARTICLE_APPEND = [{'tag': 'p', 'children': ['  ']}, {'tag': 'h4', 'children': ['
                   {'tag': 'p', 'children': ['Note: If device not found then no support. '
                                             'If device has no hyperlink then no GIF yet.']}]
 ADMINS = [208589966, 130107302]
+BUMP_SECONDS = 12 * 60 * 60

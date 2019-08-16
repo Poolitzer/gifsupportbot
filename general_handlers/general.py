@@ -3,7 +3,7 @@ from database import database
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, MessageEntity
 from telegram.error import BadRequest
 from telegram.utils.helpers import mention_html
-from constants import RECORDED_CHANNEL_ID, EDITED_CHANNEL_ID, ADMINS
+from constants import RECORDED_CHANNEL_ID, EDITED_CHANNEL_ID, ADMINS, BUMP_SECONDS
 from job_handlers.bump_timer import bump_recorded, bump_edited
 from utils import log_action
 
@@ -98,7 +98,7 @@ def cancel(update, context):
         except BadRequest:
             pass
         if not context.job_queue.get_jobs_by_name(user_data["gif_id"]):
-            context.job_queue.run_repeating(bump_recorded, 2 * 60 * 60, name=user_data["gif_id"],
+            context.job_queue.run_repeating(bump_recorded, BUMP_SECONDS, name=user_data["gif_id"],
                                             context=user_data["message_id"])
         update.message.reply_text("Cancelled!")
     elif managing:
@@ -112,7 +112,7 @@ def cancel(update, context):
         except BadRequest:
             pass
         if not context.job_queue.get_jobs_by_name(user_data["gif_id"]):
-            context.job_queue.run_repeating(bump_edited, 2 * 60 * 60, name=user_data["gif_id"],
+            context.job_queue.run_repeating(bump_edited, BUMP_SECONDS, name=user_data["gif_id"],
                                             context=user_data["message_id"])
         update.message.reply_text("Cancelled!")
     # if no jobs are found, this means that the user just used it without being in a conversationhandler. So we are

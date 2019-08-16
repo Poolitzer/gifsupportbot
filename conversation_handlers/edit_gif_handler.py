@@ -1,6 +1,6 @@
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ParseMode, ChatAction
 from telegram.utils.helpers import mention_html
-from constants import RECORDED_CHANNEL_ID, EDITED_CHANNEL_ID
+from constants import RECORDED_CHANNEL_ID, EDITED_CHANNEL_ID, BUMP_SECONDS
 from job_handlers.bump_timer import bump_recorded, bump_edited
 from utils import log_action
 from database import database
@@ -65,7 +65,7 @@ def add_edited(update, context):
     button = [[InlineKeyboardButton("I want to manage!",
                                     url=f"https://telegram.me/gifsupportbot?start=manage_{gif_id}_{message_id}")]]
     context.bot.edit_message_reply_markup(EDITED_CHANNEL_ID, message_id, reply_markup=InlineKeyboardMarkup(button))
-    context.job_queue.run_repeating(bump_edited, 2 * 60 * 60, name=gif_id, context=message_id)
+    context.job_queue.run_repeating(bump_edited, BUMP_SECONDS, name=gif_id, context=message_id)
     for message_id in database.get_gif_recorded_bumps(gif_id):
         context.bot.delete_message(RECORDED_CHANNEL_ID, message_id)
     context.bot.edit_message_caption(RECORDED_CHANNEL_ID, context.user_data["message_id"],
@@ -117,7 +117,7 @@ def two_hours_timer(context):
                                                           f"{data['gif_id']}_{data['message_id']}")]]
     context.bot.edit_message_caption(RECORDED_CHANNEL_ID, data["message_id"], caption="",
                                      reply_markup=InlineKeyboardMarkup(button))
-    context.job_queue.run_repeating(bump_recorded, 2 * 60 * 60, name=data["gif_id"], context=data["message_id"])
+    context.job_queue.run_repeating(bump_recorded, BUMP_SECONDS, name=data["gif_id"], context=data["message_id"])
 
 
 def cancel(update, context):
@@ -127,7 +127,7 @@ def cancel(update, context):
                                                           f"{data['gif_id']}_{data['message_id']}")]]
     context.bot.edit_message_caption(RECORDED_CHANNEL_ID, data["message_id"], caption="",
                                      reply_markup=InlineKeyboardMarkup(button))
-    context.job_queue.run_repeating(bump_recorded, 2 * 60 * 60, name=data["gif_id"], context=data["message_id"])
+    context.job_queue.run_repeating(bump_recorded, BUMP_SECONDS, name=data["gif_id"], context=data["message_id"])
     name = "edited" + str(user_id)
     for job in context.job_queue.get_jobs_by_name(name):
         job.schedule_removal()
