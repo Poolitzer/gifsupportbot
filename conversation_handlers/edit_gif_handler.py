@@ -1,6 +1,7 @@
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ParseMode, ChatAction
+from telegram.error import BadRequest
 from telegram.utils.helpers import mention_html
-from constants import RECORDED_CHANNEL_ID, EDITED_CHANNEL_ID, BUMP_SECONDS
+from constants import RECORDED_CHANNEL_ID, EDITED_CHANNEL_ID, BUMP_SECONDS, DELETEBUMPS, DELETEGIF
 from job_handlers.bump_timer import bump_recorded, bump_edited
 from utils import log_action
 from database import database
@@ -67,7 +68,11 @@ def add_edited(update, context):
     context.bot.edit_message_reply_markup(EDITED_CHANNEL_ID, message_id, reply_markup=InlineKeyboardMarkup(button))
     context.job_queue.run_repeating(bump_edited, BUMP_SECONDS, name=gif_id, context=message_id)
     for message_id in database.get_gif_recorded_bumps(gif_id):
-        context.bot.delete_message(RECORDED_CHANNEL_ID, message_id)
+        try:
+            context.bot.delete_message(RECORDED_CHANNEL_ID, message_id)
+        except BadRequest:
+            context.bot.send_message(RECORDED_CHANNEL_ID, DELETEBUMPS, reply_to_message_id=message_id)
+            break
     context.bot.edit_message_caption(RECORDED_CHANNEL_ID, context.user_data["message_id"],
                                      caption="Done by " + update.effective_user.first_name)
     log_action(context, update.effective_user.first_name, user_id, edited_gif_id=gif_id, file_id=file_id)
@@ -93,9 +98,15 @@ def notify_recorder(update, context):
     name = "edited" + str(user_id)
     for job in context.job_queue.get_jobs_by_name(name):
         job.schedule_removal()
-    context.bot.delete_message(RECORDED_CHANNEL_ID, message_id)
-    for message_id in database.get_gif_recorded_bumps(gif_id):
+    try:
         context.bot.delete_message(RECORDED_CHANNEL_ID, message_id)
+    except BadRequest:
+        context.bot.send_message(RECORDED_CHANNEL_ID, DELETEGIF, reply_to_message_id=message_id)
+    for message_id in database.get_gif_recorded_bumps(gif_id):
+        try:
+            context.bot.delete_message(RECORDED_CHANNEL_ID, message_id)
+        except BadRequest:
+            context.bot.send_message(RECORDED_CHANNEL_ID, DELETEBUMPS, reply_to_message_id=message_id)
     ps = "\n\nP.S: Discuss this issue with " + mention_html(user_id, user_name) + " if needed. Either in the " \
                                                                                   "group or private."
     note += ps

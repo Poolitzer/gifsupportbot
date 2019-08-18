@@ -1,7 +1,9 @@
 from telegram import (InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup,
                       ReplyKeyboardRemove, ParseMode, MessageEntity, ChatAction)
+from telegram.error import BadRequest
 from telegram.utils.helpers import mention_html
-from constants import EDITED_CHANNEL_ID, CATEGORIES, RECORDED_CHANNEL_ID, POST_CHANNEL_ID, BUMP_SECONDS
+from constants import (EDITED_CHANNEL_ID, CATEGORIES, RECORDED_CHANNEL_ID, POST_CHANNEL_ID, BUMP_SECONDS,
+                       DELETEBUMPS, DELETEGIF)
 import utils
 from job_handlers.bump_timer import bump_edited, bump_recorded
 from database import database
@@ -180,10 +182,13 @@ def add_gif_to_sub(context, user_id, first_name):
     name = "managed" + str(user_id)
     for job in context.job_queue.get_jobs_by_name(name):
         job.schedule_removal()
-    context.bot.edit_message_caption(EDITED_CHANNEL_ID, user_data["message_id"],
-                                     caption="Done by " + first_name)
+    context.bot.edit_message_caption(EDITED_CHANNEL_ID, user_data["message_id"], caption="Done by " + first_name)
     for message_id in database.get_gif_recorded_bumps(gif_id):
-        context.bot.delete_message(EDITED_CHANNEL_ID, message_id)
+        try:
+            context.bot.delete_message(EDITED_CHANNEL_ID, message_id)
+        except BadRequest:
+            context.bot.send_message(EDITED_CHANNEL_ID, DELETEBUMPS, reply_to_message_id=message_id)
+            break
     database.insert_gif_manager(gif_id, user_id)
     utils.log_action(context, first_name, user_id, category=user_data["category"], subcategory_id=user_data["sub_id"],
                      file_id=user_data["file_id"], gif_to_sub=gif_id)
@@ -232,9 +237,16 @@ def notify_editor(update, context):
     name = "managed" + str(user_id)
     for job in context.job_queue.get_jobs_by_name(name):
         job.schedule_removal()
-    context.bot.delete_message(EDITED_CHANNEL_ID, message_id)
-    for message_id in database.get_gif_edited_bumps(gif_id):
+    try:
         context.bot.delete_message(EDITED_CHANNEL_ID, message_id)
+    except BadRequest:
+        context.bot.send_message(EDITED_CHANNEL_ID, DELETEGIF, reply_to_message_id=message_id)
+    for message_id in database.get_gif_edited_bumps(gif_id):
+        try:
+            context.bot.delete_message(EDITED_CHANNEL_ID, message_id)
+        except BadRequest:
+            context.bot.send_message(EDITED_CHANNEL_ID, DELETEBUMPS, reply_to_message_id=message_id)
+            break
     ps = "\n\nP.S: Discuss this issue with " + mention_html(user_id, user_name) + " if needed. Either in the " \
                                                                                   "group or private."
     note += ps
@@ -270,9 +282,16 @@ def notify_recorder(update, context):
     name = "managed" + str(user_id)
     for job in context.job_queue.get_jobs_by_name(name):
         job.schedule_removal()
-    context.bot.delete_message(EDITED_CHANNEL_ID, message_id)
-    for message_id in database.get_gif_edited_bumps(gif_id):
+    try:
         context.bot.delete_message(EDITED_CHANNEL_ID, message_id)
+    except BadRequest:
+        context.bot.send_message(EDITED_CHANNEL_ID, DELETEGIF, reply_to_message_id=message_id)
+    for message_id in database.get_gif_edited_bumps(gif_id):
+        try:
+            context.bot.delete_message(EDITED_CHANNEL_ID, message_id)
+        except BadRequest:
+            context.bot.send_message(EDITED_CHANNEL_ID, DELETEBUMPS, reply_to_message_id=message_id)
+            break
     ps = "\n\nP.S: Discuss this issue with " + mention_html(user_id, user_name) + " if needed. Either in the " \
                                                                                   "group or private."
     note += ps
