@@ -15,7 +15,7 @@ def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
 def log_action(context, first_name, user_id, recorded_gif_id="", edited_gif_id="", file_id="", category="",
                subcategory_id="", created_sub=None, gif_to_sub=None, titles=None, description=None, links=None,
                deleted_keyword="", new_keyword="", edit_sub_gif=None, new_person=None, new_position=None,
-               removed_person=None):
+               removed_person=None, title=""):
     body = f"{mention_html(int(user_id), first_name)} (#tq{user_id}) "
     if recorded_gif_id:
         body += f"<b>added a GIF.</b>\n\nId: #{recorded_gif_id}"
@@ -54,6 +54,8 @@ def log_action(context, first_name, user_id, recorded_gif_id="", edited_gif_id="
         body += f"<b>got himself the following position(s):</b> {', '.join(new_position)}"
     elif removed_person:
         body += f"<b>is removed from the project</b>"
+    elif title:
+        body += f"<b>added the title {title}.</b>"
     if not created_sub and category:
         body += f"\n\nCategory: <i>{category}</i>\nId: #{subcategory_id}"
     if file_id:

@@ -2,6 +2,7 @@ import logging
 from constants import CATEGORIES
 from pymongo import MongoClient
 from bson import ObjectId
+import json
 
 
 class Database:
@@ -11,6 +12,15 @@ class Database:
         self.logger.debug("Database init")
         self.db = MongoClient()
         self.db = self.db["gifsupportbot"]
+        self.titles = json.load(open("./titles.json"))
+
+    def save_titles(self):
+        with open("./titles.json", "w") as outfile:
+            json.dump(self.titles, outfile, indent=4, sort_keys=True)
+
+    def add_title(self, category, title):
+        self.titles[category].append(title)
+        self.save_titles()
 
     def insert_user(self, user):
         temp = self.db.users.find_one({"id": user.id})
@@ -82,13 +92,9 @@ class Database:
         gif_id = ObjectId(gif_id)
         return self.db.gifs.find_one({"_id": gif_id})["edited_gif_bumps"]
 
-    def get_gif_device(self, gif_id):
+    def get_gif(self, gif_id):
         gif_id = ObjectId(gif_id)
-        return self.db.gifs.find_one({"_id": gif_id})["device"]
-
-    def get_gif_recorded_id(self, gif_id):
-        gif_id = ObjectId(gif_id)
-        return self.db.gifs.find_one({"_id": gif_id})["recorded_gif_id"]
+        return self.db.gifs.find_one({"_id": gif_id})
 
     def get_gif_edited_gif_id(self, gif_id):
         gif_id = ObjectId(gif_id)
@@ -100,22 +106,30 @@ class Database:
 
     def get_subcategories_device_category(self, category, device):
         to_return = []
-        for post in self.db[category].find({f"devices.{device}.file_id": {"$not": {"$type": "string"}}}):
-            to_return.append(post["title"])
+        for title in self.titles[category]:
+            for post in self.db[category].find({"title": title,
+                                                f"devices.{device}.file_id": {"$not": {"$type": "string"}}}):
+                to_return.append(post["title"])
         return to_return
 
-    def get_subcategories_title(self, category):
-        to_return = []
-        for post in self.db[category].find():
-            to_return.append(post["title"])
-        return to_return
-
-    def is_title_unique(self, category, title):
-        temp = self.db[category].find_one({"title": title})
-        if temp:
+    def is_title_in_categories(self, category, title):
+        if self.db[category].find_one({"title": title}):
             return True
         else:
             return False
+
+    def get_subcategories_title(self, category):
+        to_return = []
+        for title in self.titles[category]:
+            to_return.append(title)
+        return to_return
+
+    def is_title_not_unique(self, category, title):
+        titles = self.titles[category]
+        for original_title in titles:
+            if title == original_title:
+                return True
+        return False
 
     def insert_subcategory(self, category, subcategory):
         return str(self.db[category].insert_one(vars(subcategory)).inserted_id)
@@ -150,6 +164,13 @@ class Database:
     def update_subcategory_title(self, category, old_title, new_title):
         temp = self.db[category].find_one({"title": old_title})
         self.db[category].update_one({"title": old_title}, {"$set": {"title": new_title}})
+        index_to_change = 0
+        for index, title in enumerate(self.titles[category]):
+            if title == old_title:
+                index_to_change = index
+                break
+        self.titles[category][index_to_change] = new_title
+        self.save_titles()
         to_return = []
         for device in temp["devices"]:
             if temp["devices"][device]["message_id"]:

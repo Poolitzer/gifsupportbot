@@ -1,11 +1,12 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup,
+                      ReplyKeyboardRemove)
 from database import database
 import utils
 from objects.gif import Gif
-from constants import RECORDED_CHANNEL_ID, DEVICES
+from constants import RECORDED_CHANNEL_ID, DEVICES, CATEGORIES, BUMP_SECONDS
 from job_handlers.bump_timer import bump_recorded
 # states
-GIF_DEVICE, NEW_GIF, DEVICE = range(3)
+GIF_DEVICE, GET_CATEGORY, GET_TITLE, NEW_GIF, DEVICE = range(5)
 
 
 def add_command(update, _):
@@ -26,7 +27,44 @@ def add_device(update, context):
     user_data = context.user_data
     real_device = query.data[13:]
     user_data["device"] = real_device
-    query.edit_message_text("Great. Send your recorded GIF in the highest quality now, as a file please :)")
+    buttons = []
+    for category in CATEGORIES:
+        buttons.append(KeyboardButton(category))
+    query.edit_message_text("Great. Now, choose a category :)",
+                            reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
+    return GET_CATEGORY
+
+
+def add_category(update, context):
+    user_data = context.user_data
+    category = update.effective_message.text
+    user_data["category"] = category
+    real_device = user_data["device"]
+    titles = database.get_subcategories_device_category(category, real_device)
+    if titles:
+        buttons = []
+        for title in titles:
+            buttons.append(KeyboardButton(title))
+            update.effective_message.reply_text("Okay. Select a fitting subcategory now please.",
+                                                reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
+            return GET_TITLE
+    else:
+        buttons = []
+        for category in CATEGORIES:
+            buttons.append(KeyboardButton(category))
+        message = "Sorry, no free subcategory left in this category for your device. Please contact the manager of " \
+                  "your choice in the GIF support group if you think that's a mistake, otherwise select another " \
+                  "category or hit /cancel"
+        update.effective_message.reply_text(message, reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
+        return GET_CATEGORY
+
+
+def add_title(update, context):
+    user_data = context.user_data
+    title = update.effective_message.text
+    user_data["title"] = title
+    update.effective_message.reply_text("Alright. Now, send me the GIF please. As a .mp4 file ;)",
+                                        reply_markup=ReplyKeyboardRemove())
     return NEW_GIF
 
 
@@ -82,9 +120,10 @@ def add_gif(update, context):
     if update.message.document.mime_type != "video/mp4":
         update.message.reply_text("That's not a video. Please send a video as a file or send /cancel to abort.")
         return NEW_GIF
-    update.message.reply_text("Nice, ty. Editors have been notified.")
+    update.message.reply_text("Nice, ty. Editors will be notified.")
     file_id = update.message.document.file_id
-    gif_id = database.insert_gif(Gif(file_id, user_data["device"], update.effective_user.id))
+    gif_id = database.insert_gif(Gif(file_id, user_data["device"], update.effective_user.id, user_data["category"],
+                                     user_data["title"]))
     message = context.bot.send_document(RECORDED_CHANNEL_ID, file_id)
     message_id = message.message_id
     button = [[InlineKeyboardButton("I want to edit",

@@ -67,7 +67,7 @@ def update_title(update, _):
 def returned_title(update, context):
     title = update.message.text
     user_data = context.user_data
-    if database.is_title_unique(user_data["category"], title):
+    if database.is_title_not_unique(user_data["category"], title):
         update.message.reply_text("This title is already used, please select another one or hit /cancel.")
         return UPDATE_TITLE
     else:

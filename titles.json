@@ -1,0 +1,10 @@
+{
+  "Info": ["Change display name", "Changing phone numbers", "Delete a profile picture", "Logout", "Set a bio",
+    "Set a profile picture", "Set a username"],
+  "Notifications": ["Modify notifications and sounds"],
+  "Privacy": ["Access Telegram Passport", "Add remove documents from Telegram Passport", "Avoid being added to groups", "Block calls", "Block last seen status", "Block unblock someone", "Clear payment and shipping info", "Configure account self-destruction", "Configure P2P in Telegram calls", "Control what Telegram does with your contacts", "Delete all cloud drafts", "Disconnect from websites signed in with Telegram", "Secretchat settings", "Setup passcode lock", "Setup two-step verification", "Terminate active sessions"],
+  "Data": ["Configure auto-download media", "Configure Proxy Settings", "Enable disable media streaming", "Manage storage usage", "Respond to calls with text", "Use less data for calls"],
+  "Chat Settings": ["Change themes", "Configure auto-night mode", "Other settings", "Setting a background", "Stickers and masks"],
+  "Language": ["Change language"],
+  "Help": ["Ask a Question", "FAQ and Privacy Policy"]
+}

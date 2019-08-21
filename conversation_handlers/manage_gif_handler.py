@@ -1,16 +1,15 @@
-from telegram import (InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup,
-                      ReplyKeyboardRemove, ParseMode, MessageEntity, ChatAction)
+from telegram import (InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, ParseMode, MessageEntity,
+                      ChatAction)
 from telegram.error import BadRequest
 from telegram.utils.helpers import mention_html
-from constants import (EDITED_CHANNEL_ID, CATEGORIES, RECORDED_CHANNEL_ID, POST_CHANNEL_ID, BUMP_SECONDS,
-                       DELETEBUMPS, DELETEGIF)
+from constants import EDITED_CHANNEL_ID, RECORDED_CHANNEL_ID, POST_CHANNEL_ID, BUMP_SECONDS, DELETEBUMPS, DELETEGIF
 import utils
 from job_handlers.bump_timer import bump_edited, bump_recorded
 from database import database
 from objects.subcategory import Subcategory
 from telegraph_handler import telegraph
 
-CATEGORY, EDIT_FIX, NOTE_EDIT, NOTE_RECORD, SUBCATEGORY, NEW_TITLE, NEW_DESCRIPTION, HELP_URL, KEYWORD = range(9)
+EDIT_FIX, NOTE_EDIT, NOTE_RECORD, NEW_DESCRIPTION, HELP_URL, KEYWORD = range(6)
 
 
 # initial handler, not really in the conversation but who needs that anyway
@@ -24,16 +23,18 @@ def manage_what(update, context):
     context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
     gif_id = data[1]
     message_id = data[2]
-    file_id = database.get_gif_edited_gif_id(gif_id)
-    device = database.get_gif_device(gif_id)
-    context.user_data.update({"gif_id": gif_id, "message_id": message_id, "file_id": file_id, "device": device,
-                              "category": "", "subcategory": "", "keywords": [], "help_link": ""})
+    gif = database.get_gif(gif_id)
+    context.user_data.update({"gif_id": gif_id, "message_id": message_id, "file_id": gif["edited_gif_id"],
+                              "device": gif["device"], "category": gif["category"], "title": gif["title"],
+                              "keywords": [], "help_link": ""})
     context.bot.edit_message_caption(EDITED_CHANNEL_ID, message_id,
                                      "Currently worked on by " + update.effective_user.first_name)
     buttons = [[InlineKeyboardButton("Yes", callback_data="is_edit_yes"),
                 InlineKeyboardButton("No", callback_data="is_edit_no")]]
-    caption = "Is this GIF really good?"
-    context.bot.send_document(user_id, file_id, caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
+    caption = f"Is this GIF really good? Make sure it fits the category ({gif['category']}) and subcategory " \
+              f"({gif['title']}), as well as the device ({gif['device']})"
+    context.bot.send_document(user_id, gif["edited_gif_id"], caption=caption,
+                              reply_markup=InlineKeyboardMarkup(buttons))
     payload = {"message_id": message_id, "gif_id": gif_id}
     name = "managed" + str(user_id)
     context.job_queue.run_once(two_hours_timer, 2 * 60 * 60, name=name, context=payload)
@@ -43,59 +44,20 @@ def manage_what(update, context):
 
 # real conversation starts here
 # gif is good
-def proceed(update, _):
+def proceed(update, context):
     query = update.callback_query
-    buttons = []
-    for category in CATEGORIES:
-        buttons.append(KeyboardButton(category))
-    query.answer()
-    update.effective_message.reply_text("LETS DO THIS. You first need to pick a category.\nIf you're not sure what "
-                                        "category it belongs to, contact GIF group for assistance.\n\n"
-                                        "And dont forget /cancel.",
-                                        reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
-    return CATEGORY
-
-
-def subcategory(update, context):
-    category = update.message.text
-    context.user_data["category"] = category
-    device = database.get_gif_device(context.user_data["gif_id"])
-    subcategories = database.get_subcategories_device_category(category, device)
-    buttons = []
-    for title in subcategories:
-        buttons.append(KeyboardButton(title))
-    footer = [KeyboardButton("New subcategory")]
-    update.message.reply_text("Now either pick a fitting subcategory or choose New to add a new one.",
-                              reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3, footer_buttons=footer)))
-    return SUBCATEGORY
-
-
-def existing_sub(update, context):
     user_data = context.user_data
-    title = update.message.text
-    user_data["title"] = title
-    user_data["help_link"] = database.get_subcategory_help_link(user_data["category"], user_data["title"])
-    user_id = update.effective_user.id
-    add_gif_to_sub(context, user_id, update.effective_user.first_name)
-    update.message.reply_text("Done, thanks!", reply_markup=ReplyKeyboardRemove())
-    # end conversation
-    return -1
-
-
-def new_sub(update, _):
-    update.message.reply_text("Great. Please tell me the title of the new subcategory. It must be unique in the "
-                              "category and it should be as short as possible.", reply_markup=ReplyKeyboardRemove())
-    return NEW_TITLE
-
-
-def new_title(update, context):
-    title = update.message.text
-    if database.is_title_unique(context.user_data["category"], title):
-        update.message.reply_text("This title is already used, please select another one or hit /cancel.")
-        return NEW_TITLE
+    if database.is_title_in_categories(user_data["category"], user_data["title"]):
+        user_data["help_link"] = database.get_subcategory_help_link(user_data["category"], user_data["title"])
+        user_id = update.effective_user.id
+        add_gif_to_sub(context, user_id, update.effective_user.first_name)
+        query.answer()
+        update.effective_message.reply_text("Alright, thanks for confirming.")
+        # end conversation
+        return -1
     else:
-        context.user_data["title"] = title
-        update.message.reply_text("Great, this title works. Now send me a description of this subcategory")
+        query.answer()
+        update.effective_message.reply_text("LETS DO THIS. Dend me a description of this subcategory")
         return NEW_DESCRIPTION
 
 

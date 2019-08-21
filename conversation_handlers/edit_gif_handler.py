@@ -19,8 +19,9 @@ def edit_what(update, context):
     context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
     gif_id = data[1]
     message_id = data[2]
-    file_id = database.get_gif_recorded_id(gif_id)
-    context.user_data.update({"gif_id": gif_id, "message_id": message_id, "file_id": file_id})
+    gif = database.get_gif(gif_id)
+    context.user_data.update({"gif_id": gif_id, "message_id": message_id, "file_id": gif["recorded_id"],
+                              "device": gif["device"], "category": gif["category"], "title": gif["title"]})
     context.bot.edit_message_caption(RECORDED_CHANNEL_ID, message_id,
                                      caption=f"Currently worked on by {update.effective_user.first_name}")
     edited_id = database.get_gif_edited_gif_id(gif_id)
@@ -32,8 +33,8 @@ def edit_what(update, context):
                 InlineKeyboardButton("No", callback_data="record_no")]]
     caption = "Is this GIF good?\n\nP.S.: If the initial GIF didn't follow the guidelines, it" \
               " may appear again in the recorded GIFs channel."
-    context.bot.send_document(user_id, file_id, caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
-    payload = {"message_id-": message_id, "gif_id": gif_id}
+    context.bot.send_document(user_id, gif["recorded_id"], caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
+    payload = {"message_id": message_id, "gif_id": gif_id}
     name = "edited" + str(user_id)
     context.job_queue.run_once(two_hours_timer, 2 * 60 * 60, name=name, context=payload)
     for job in context.job_queue.get_jobs_by_name(gif_id):
@@ -42,12 +43,14 @@ def edit_what(update, context):
 
 # real conversation starts here
 # gif is good
-def proceed(update, _):
+def proceed(update, context):
     query = update.callback_query
-    query.edit_message_caption("Have fun then. You have like what... 2 hours? Or so? Hurry up! And send me the edited "
-                               "recording as a GIF and not .mp4 or other formats or I will just ignore you.\n\n"
-                               "If you don't want to edit and give the GIF back without the two hours wait time, "
-                               "send me /cancel.")
+    user_data = context.user_data
+    text = "Have fun then. You have like what... 2 hours? Or so? Hurry up! And send me the edited recording as a GIF " \
+           f"and not .mp4 or other formats or I will just ignore you.\nBtw, the used device is {user_data['device']}," \
+           f" the category {user_data['category']} and the subcategory {user_data['title']}\n\nIf you don't want to " \
+           f"edit and give the GIF back without the two hours wait time, send me /cancel."
+    query.edit_message_caption(text)
     return EDITED
 
 

@@ -4,7 +4,7 @@ from telegram.ext import (Updater, CallbackQueryHandler, ConversationHandler, Co
 from tokens import bottoken
 from general_handlers import general
 from conversation_handlers import (start_handler, add_gif_handler, edit_gif_handler, manage_gif_handler,
-                                   update_subcategory_handler)
+                                   update_subcategory_handler, add_title_handler)
 from inline_handler.inline import inline
 from job_handlers import database_dump, online_ping, job_persistent
 from constants import ADMINS
@@ -32,6 +32,8 @@ def main():
                                                               pattern="update_device")],
             add_gif_handler.DEVICE: [CallbackQueryHandler(add_gif_handler.device, pattern="user_devices"),
                                      CallbackQueryHandler(add_gif_handler.finish, pattern="finish")],
+            add_gif_handler.GET_CATEGORY: [MessageHandler(Filters.text, add_gif_handler.add_category)],
+            add_gif_handler.GET_TITLE: [MessageHandler(Filters.text, add_gif_handler.add_title)],
             add_gif_handler.NEW_GIF: [MessageHandler(Filters.document, add_gif_handler.add_gif)]
         },
         fallbacks=[CommandHandler('cancel', add_gif_handler.cancel)], persistent=True, name="add_gif_handler")
@@ -59,11 +61,6 @@ def main():
         entry_points=[CallbackQueryHandler(manage_gif_handler.proceed, pattern="is_edit_yes"),
                       CallbackQueryHandler(manage_gif_handler.abort, pattern="is_edit_no")],
         states={
-            manage_gif_handler.CATEGORY: [MessageHandler(Filters.text, manage_gif_handler.subcategory)],
-            manage_gif_handler.SUBCATEGORY: [MessageHandler(Filters.text & Filters.regex("New subcategory"),
-                                                            manage_gif_handler.new_sub),
-                                             MessageHandler(Filters.text, manage_gif_handler.existing_sub)],
-            manage_gif_handler.NEW_TITLE: [MessageHandler(Filters.text, manage_gif_handler.new_title)],
             manage_gif_handler.NEW_DESCRIPTION: [MessageHandler(Filters.text, manage_gif_handler.new_description)],
             manage_gif_handler.HELP_URL: [MessageHandler((Filters.text & (Filters.entity("url") |
                                                          Filters.entity("text_link"))),  manage_gif_handler.add_url),
@@ -132,6 +129,16 @@ def main():
         fallbacks=[CommandHandler('cancel', start_handler.cancel)], persistent=True, name="start_handler",
         allow_reentry=True)
     dp.add_handler(conversation_handler)
+    # add a new title
+    conv_add_handler = ConversationHandler(
+        entry_points=[CommandHandler("add_title", add_title_handler.start, filters=Filters.private)],
+        states={
+            add_title_handler.GET_CATEGORY: [MessageHandler(Filters.text, add_title_handler.add_category)],
+            add_title_handler.GET_TITLE: [MessageHandler(Filters.text, add_title_handler.add_title)]
+        },
+        fallbacks=[CommandHandler('cancel', add_gif_handler.cancel)], persistent=True, name="add_title_handler"
+    )
+    dp.add_handler(conv_add_handler)
     # relatively smart general cancel handler
     dp.add_handler(CommandHandler("cancel", general.cancel))
     # help handler, displays a help message
