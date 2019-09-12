@@ -107,9 +107,8 @@ class Database:
     def get_subcategories_device_category(self, category, device):
         to_return = []
         for title in self.titles[category]:
-            for post in self.db[category].find({"title": title,
-                                                f"devices.{device}.file_id": {"$not": {"$type": "string"}}}):
-                to_return.append(post["title"])
+            if not self.db[category].find_one({"title": title, f"devices.{device}.file_id": {"$type": "string"}}):
+                to_return.append(title)
         return to_return
 
     def is_title_in_categories(self, category, title):
@@ -120,8 +119,8 @@ class Database:
 
     def get_subcategories_title(self, category):
         to_return = []
-        for title in self.titles[category]:
-            to_return.append(title)
+        for post in self.db[category].find():
+            to_return.append(post["title"])
         return to_return
 
     def is_title_not_unique(self, category, title):

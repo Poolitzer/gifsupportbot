@@ -26,7 +26,7 @@ def manage_what(update, context):
     gif = database.get_gif(gif_id)
     context.user_data.update({"gif_id": gif_id, "message_id": message_id, "file_id": gif["edited_gif_id"],
                               "device": gif["device"], "category": gif["category"], "title": gif["title"],
-                              "keywords": [], "help_link": ""})
+                              "keywords": [], "help_link": "", "recorder": gif["recorded_gif_id"]})
     context.bot.edit_message_caption(EDITED_CHANNEL_ID, message_id,
                                      "Currently worked on by " + update.effective_user.first_name)
     buttons = [[InlineKeyboardButton("Yes", callback_data="is_edit_yes"),
@@ -57,7 +57,7 @@ def proceed(update, context):
         return -1
     else:
         query.answer()
-        update.effective_message.reply_text("LETS DO THIS. Dend me a description of this subcategory")
+        update.effective_message.reply_text("LETS DO THIS. Send me a description of this subcategory")
         return NEW_DESCRIPTION
 
 
@@ -240,6 +240,7 @@ def notify_recorder(update, context):
     gif_id = context.user_data["gif_id"]
     message_id = context.user_data["message_id"]
     file_id = context.user_data["file_id"]
+    recorder = context.user_data["recorder"]
     update.message.reply_text("Thank you, I notified the recorder")
     name = "managed" + str(user_id)
     for job in context.job_queue.get_jobs_by_name(name):
@@ -258,10 +259,10 @@ def notify_recorder(update, context):
                                                                                   "group or private."
     note += ps
     if len(note) > 1024:
-        context.bot.send_document(chat_id=int(user_id), document=file_id)
-        context.bot.send_message(chat_id=int(user_id), text=note, parse_mode=ParseMode.HTML)
+        context.bot.send_document(chat_id=int(recorder), document=file_id)
+        context.bot.send_message(chat_id=int(recorder), text=note, parse_mode=ParseMode.HTML)
     else:
-        context.bot.send_document(chat_id=int(user_id), document=file_id, caption=note, parse_mode=ParseMode.HTML)
+        context.bot.send_document(chat_id=int(recorder), document=file_id, caption=note, parse_mode=ParseMode.HTML)
     database.delete_gif(gif_id)
     # end conversation
     return -1

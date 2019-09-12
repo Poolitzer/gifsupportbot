@@ -4,7 +4,7 @@ from database import database
 import utils
 
 
-GET_CATEGORY, GET_TITLE = range(1)
+GET_CATEGORY, GET_TITLE = range(2)
 
 
 def start(update, _):
@@ -25,7 +25,7 @@ def add_category(update, context):
     user_data = context.user_data
     category = update.effective_message.text
     user_data["category"] = category
-    update.effective_message.reply_text("Wuhu. Now, send me the new title.", reply_markup=ReplyKeyboardRemove)
+    update.effective_message.reply_text("Wuhu. Now, send me the new title.", reply_markup=ReplyKeyboardRemove())
     return GET_TITLE
 
 

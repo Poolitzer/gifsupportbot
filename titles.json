@@ -6,5 +6,7 @@
   "Data": ["Configure auto-download media", "Configure Proxy Settings", "Enable disable media streaming", "Manage storage usage", "Respond to calls with text", "Use less data for calls"],
   "Chat Settings": ["Change themes", "Configure auto-night mode", "Other settings", "Setting a background", "Stickers and masks"],
   "Language": ["Change language"],
-  "Help": ["Ask a Question", "FAQ and Privacy Policy"]
+  "Help": ["Ask a Question", "FAQ and Privacy Policy"],
+  "Menu": [], "Chat list": [],
+              "Chats": [], "Groups": [], "Saved Messages": [], "Channels": [], "Secretchats": []
 }

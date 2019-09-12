@@ -30,8 +30,9 @@ def add_device(update, context):
     buttons = []
     for category in CATEGORIES:
         buttons.append(KeyboardButton(category))
-    query.edit_message_text("Great. Now, choose a category :)",
-                            reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
+    query.answer()
+    update.effective_message.reply_text("Great. Now, choose a category :)",
+                                        reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
     return GET_CATEGORY
 
 
@@ -45,9 +46,9 @@ def add_category(update, context):
         buttons = []
         for title in titles:
             buttons.append(KeyboardButton(title))
-            update.effective_message.reply_text("Okay. Select a fitting subcategory now please.",
-                                                reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
-            return GET_TITLE
+        update.effective_message.reply_text("Okay. Select a fitting subcategory now please.",
+                                            reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
+        return GET_TITLE
     else:
         buttons = []
         for category in CATEGORIES:
