@@ -35,9 +35,6 @@ def manage_what(update, context):
               f"({gif['title']}), as well as the device ({gif['device']})"
     context.bot.send_document(user_id, gif["edited_gif_id"], caption=caption,
                               reply_markup=InlineKeyboardMarkup(buttons))
-    payload = {"message_id": message_id, "gif_id": gif_id}
-    name = "managed" + str(user_id)
-    context.job_queue.run_once(two_hours_timer, 2 * 60 * 60, name=name, context=payload)
     for job in context.job_queue.get_jobs_by_name(gif_id):
         job.schedule_removal()
 
@@ -141,9 +138,6 @@ def add_gif_to_sub(context, user_id, first_name):
     database.insert_device(user_data["category"], user_data["title"], user_data["device"], user_data["file_id"],
                            message_id)
     telegraph.update_page()
-    name = "managed" + str(user_id)
-    for job in context.job_queue.get_jobs_by_name(name):
-        job.schedule_removal()
     context.bot.edit_message_caption(EDITED_CHANNEL_ID, user_data["message_id"], caption="Done by " + first_name)
     for message_id in database.get_gif_recorded_bumps(gif_id):
         try:
@@ -196,9 +190,6 @@ def notify_editor(update, context):
     message_id = context.user_data["message_id"]
     file_id = context.user_data["file_id"]
     update.message.reply_text("Thank you, I notified the editors")
-    name = "managed" + str(user_id)
-    for job in context.job_queue.get_jobs_by_name(name):
-        job.schedule_removal()
     try:
         context.bot.delete_message(EDITED_CHANNEL_ID, message_id)
     except BadRequest:
@@ -242,9 +233,6 @@ def notify_recorder(update, context):
     file_id = context.user_data["file_id"]
     recorder = context.user_data["recorder"]
     update.message.reply_text("Thank you, I notified the recorder")
-    name = "managed" + str(user_id)
-    for job in context.job_queue.get_jobs_by_name(name):
-        job.schedule_removal()
     try:
         context.bot.delete_message(EDITED_CHANNEL_ID, message_id)
     except BadRequest:
@@ -269,10 +257,9 @@ def notify_recorder(update, context):
 
 
 # timer runs out
-def two_hours_timer(context):
-    context.bot.send_message(int(context.job.name[7:]), "Sorry, you took too long :(",
-                             reply_markup=ReplyKeyboardRemove())
-    data = context.job.context
+def two_hours_timer(update, context):
+    update.effective_message.reply_text("Sorry, you took too long :(", reply_markup=ReplyKeyboardRemove())
+    data = context.user_data
     button = [[InlineKeyboardButton("I want to manage!", url=f"https://telegram.me/gifsupportbot?start=manage_"
                                     f"{data['gif_id']}_{data['message_id']}")]]
     context.bot.edit_message_caption(EDITED_CHANNEL_ID, data["message_id"], caption="",
@@ -282,15 +269,11 @@ def two_hours_timer(context):
 
 def cancel(update, context):
     data = context.user_data
-    user_id = update.effective_user.id
     button = [[InlineKeyboardButton("I want to manage!", url=f"https://telegram.me/gifsupportbot?start=manage_"
                                     f"{data['gif_id']}_{data['message_id']}")]]
     context.bot.edit_message_caption(EDITED_CHANNEL_ID, data["message_id"], caption="",
                                      reply_markup=InlineKeyboardMarkup(button))
     context.job_queue.run_repeating(bump_edited, BUMP_SECONDS, name=data["gif_id"], context=data["message_id"])
-    name = "managed" + str(user_id)
-    for job in context.job_queue.get_jobs_by_name(name):
-        job.schedule_removal()
     update.message.reply_text("Cancelled!", reply_markup=ReplyKeyboardRemove())
     # end conversation
     return -1

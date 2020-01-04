@@ -47,7 +47,8 @@ def main():
                       CallbackQueryHandler(edit_gif_handler.abort, pattern="record_no")],
         states={
             edit_gif_handler.EDITED: [MessageHandler(Filters.animation, edit_gif_handler.add_edited)],
-            edit_gif_handler.NOTE: [MessageHandler(Filters.text, edit_gif_handler.notify_recorder)]
+            edit_gif_handler.NOTE: [MessageHandler(Filters.text, edit_gif_handler.notify_recorder)],
+            ConversationHandler.TIMEOUT: [MessageHandler(Filters.all, edit_gif_handler.two_hours_timer)]
         },
         fallbacks=[CommandHandler('cancel', edit_gif_handler.cancel)], conversation_timeout=2 * 60 * 60,
         persistent=True, name="edit_gif_handler"
@@ -70,7 +71,9 @@ def main():
             manage_gif_handler.EDIT_FIX: [CallbackQueryHandler(manage_gif_handler.edit_fix, pattern="ed_fix_yes"),
                                           CallbackQueryHandler(manage_gif_handler.record_fix, pattern="ed_fix_no")],
             manage_gif_handler.NOTE_RECORD: [MessageHandler(Filters.text, manage_gif_handler.notify_recorder)],
-            manage_gif_handler.NOTE_EDIT: [MessageHandler(Filters.text, manage_gif_handler.notify_editor)]
+            manage_gif_handler.NOTE_EDIT: [MessageHandler(Filters.text, manage_gif_handler.notify_editor)],
+            ConversationHandler.TIMEOUT: [MessageHandler(Filters.all, manage_gif_handler.two_hours_timer),
+                                          CallbackQueryHandler(manage_gif_handler.two_hours_timer)]
         },
         fallbacks=[CommandHandler('cancel', manage_gif_handler.cancel)], conversation_timeout=2 * 60 * 60,
         persistent=True, name="manage_gif_handler"

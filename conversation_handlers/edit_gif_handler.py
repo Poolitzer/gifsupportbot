@@ -36,9 +36,6 @@ def edit_what(update, context):
               " may appear again in the recorded GIFs channel."
     context.bot.send_document(user_id, gif["recorded_gif_id"], caption=caption,
                               reply_markup=InlineKeyboardMarkup(buttons))
-    payload = {"message_id": message_id, "gif_id": gif_id}
-    name = "edited" + str(user_id)
-    context.job_queue.run_once(two_hours_timer, 2 * 60 * 60, name=name, context=payload)
     for job in context.job_queue.get_jobs_by_name(gif_id):
         job.schedule_removal()
 
@@ -63,9 +60,6 @@ def add_edited(update, context):
     database.insert_edited_gif(gif_id, user_id, file_id)
     update.message.reply_text("Great, thank you. I notified the manager.\n\nP.S.: If the initial GIF didn't follow the "
                               "guidelines, it may appear again in the recorded GIFs channel")
-    name = "edited" + str(user_id)
-    for job in context.job_queue.get_jobs_by_name(name):
-        job.schedule_removal()
     message = context.bot.send_document(EDITED_CHANNEL_ID, file_id)
     message_id = message.message_id
     button = [[InlineKeyboardButton("I want to manage!",
@@ -101,9 +95,6 @@ def notify_recorder(update, context):
     file_id = context.user_data["file_id"]
     recoder = context.user_data["recorder"]
     update.message.reply_text("Thank you, I notified the recorder")
-    name = "edited" + str(user_id)
-    for job in context.job_queue.get_jobs_by_name(name):
-        job.schedule_removal()
     try:
         context.bot.delete_message(RECORDED_CHANNEL_ID, message_id)
     except BadRequest:
@@ -127,9 +118,9 @@ def notify_recorder(update, context):
 
 
 # timer runs out
-def two_hours_timer(context):
-    context.bot.send_message(int(context.job.name[6:]), "Sorry, you took too long :(")
-    data = context.job.context
+def two_hours_timer(update, context):
+    update.effective_message.reply_text("Sorry, you took too long :(")
+    data = context.user_data
     button = [[InlineKeyboardButton("I want to edit", url=f"https://telegram.me/gifsupportbot?start=edit_"
                                                           f"{data['gif_id']}_{data['message_id']}")]]
     context.bot.edit_message_caption(RECORDED_CHANNEL_ID, data["message_id"], caption="",
@@ -139,15 +130,11 @@ def two_hours_timer(context):
 
 def cancel(update, context):
     data = context.user_data
-    user_id = update.effective_user.id
     button = [[InlineKeyboardButton("I want to edit", url=f"https://telegram.me/gifsupportbot?start=edit_"
                                                           f"{data['gif_id']}_{data['message_id']}")]]
     context.bot.edit_message_caption(RECORDED_CHANNEL_ID, data["message_id"], caption="",
                                      reply_markup=InlineKeyboardMarkup(button))
     context.job_queue.run_repeating(bump_recorded, BUMP_SECONDS, name=data["gif_id"], context=data["message_id"])
-    name = "edited" + str(user_id)
-    for job in context.job_queue.get_jobs_by_name(name):
-        job.schedule_removal()
     update.message.reply_text("Cancelled!")
     # end conversation
     return -1
