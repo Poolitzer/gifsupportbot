@@ -17,8 +17,9 @@ def manage(update, _):
               "automatically created. Also note that underlines are not supported, they will be turned to spaces</i>" \
               "\n\n<b>Syntax:</b>\n/mc [category path]\n<b>Example:</b>\n<code>/mc settings.chat settings.themese" \
               "</code>\n\n" \
-              "• <b>Move/Rename category</b>\n\n<b>Syntax:</b>\n/rc [old path]>[new path]\n<b>Example:</b>\n<code>" \
-              "/rc settings.chat settings.themese>settings.chat settings.themes</code>\n\n" \
+              "• <b>Move/Rename category</b>\n<i>Note: The new path needs to exists until the last category, which " \
+              "needs to be a new one.</i>\n\n<b>Syntax:</b>\n/rc [old path]>[new path]\n<b>" \
+              "Example:</b>\n<code>/rc settings.chat settings.themese>settings.chat settings.themes</code>\n\n" \
               "• <b>Delete category</b>\n<i>Note: When you use this command, this means every gif within the " \
               "selected category gets deleted. When you provide a parent category, it and every sub category gets " \
               "deleted, potentially a lot of GIFs. Be very very careful about what you are doing here, otherwise " \
@@ -57,7 +58,13 @@ def rename_category(update, context):
         update.effective_message.reply_text("You screwed the > part up, try again")
         return
     except KeyError:
-        update.effective_message.reply_text("You screwed the path up, try again")
+        update.effective_message.reply_text("You screwed the path for the old part up, try again")
+        return
+    except FileNotFoundError:
+        update.effective_message.reply_text("The new path already exists, you can't do it like that")
+        return
+    except FileExistsError:
+        update.effective_message.reply_text("The new path does not exist until the latest category, which it has to.")
         return
     text.append(categories['changed_categories'])
     update_page()

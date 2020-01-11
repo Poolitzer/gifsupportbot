@@ -33,10 +33,13 @@ class Database:
         old = Keypath(old_path)
         new = Keypath(new_path)
         # genius work by dave, https://t.me/PythonThesaurus/125
-        print(old)
-        print(new)
-        print(self.categories[old[:-1]][old[-1]])
-        print("huhu")
+        if self.categories.has_path(new):
+            # we use this cause we can
+            raise FileNotFoundError
+        if not self.categories.has_path(new[:-1]):
+            raise FileExistsError
+        if not self.categories.has_path(old):
+            raise KeyError
         self.categories[new[:-1]][new[-1]] = self.categories[old[:-1]][old[-1]]
         del self.categories[old[:-1]][old[-1]]
         updated_categories = self.update_subcategory_path(old_path, new_path)
@@ -219,7 +222,7 @@ class Database:
         to_return = {"changed_categories": len(path_list), "post": []}
         for path in path_list:
             new_path = re.sub(rf'{old_category_path}\.', f'{new_category_path}', path)
-            requests.append(UpdateOne(path, {"category_path": new_path}))
+            requests.append(UpdateOne({"category_path": path}, {"category_path": new_path}))
             old_last = path.split(".")[-1]
             new_last = new_path.split(".")[-1]
             # that means title changed, we have to edit the channel
@@ -241,7 +244,7 @@ class Database:
         requests = []
         to_return = []
         for category in temp:
-            requests.append(DeleteOne(category["category_path"]))
+            requests.append(DeleteOne({"category_path": category["category_path"]}))
             for device in category["devices"]:
                 # that means a channel post exists
                 if category["devices"][device]["message_id"]:
