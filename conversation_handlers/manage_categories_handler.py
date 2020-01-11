@@ -34,7 +34,7 @@ def new_category(update, context):
     if not database.is_user_position(user_id, "managing"):
         return
     path = update.effective_message.text[4:]
-    path = path.replace(" ", "_")
+    path.replace(" ", "_")
     success = database.add_category(path)
     if not success:
         update.effective_message.reply_text("That category already exists or would override an existing one. "
@@ -49,8 +49,8 @@ def rename_category(update, context):
     if not database.is_user_position(user_id, "managing"):
         return
     context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
-    text = update.effective_message.text.replace(" ", "_")
-    text = text[4:].split(">")
+    update.effective_message.text.replace(" ", "_")
+    text = update.effective_message.text[4:].split(">")
     try:
         categories = database.rename_category(text[0], text[1])
     except IndexError:
@@ -76,7 +76,7 @@ def delete_category_question(update, context):
     if not database.is_user_position(user_id, "managing"):
         return
     path = update.effective_message.text[4:]
-    path = path.replace(" ", "_")
+    path.replace(" ", "_")
     categories = database.get_subcategories(path)
     how_many = {"categories": 0, "GIFs": 0}
     for category in categories:
