@@ -33,6 +33,10 @@ class Database:
         old = Keypath(old_path)
         new = Keypath(new_path)
         # genius work by dave, https://t.me/PythonThesaurus/125
+        print(old)
+        print(new)
+        print(self.categories[old[:-1]][old[-1]])
+        print("huhu")
         self.categories[new[:-1]][new[-1]] = self.categories[old[:-1]][old[-1]]
         del self.categories[old[:-1]][old[-1]]
         updated_categories = self.update_subcategory_path(old_path, new_path)
@@ -201,14 +205,14 @@ class Database:
         return self.db["categories"].find_one({"category_path": category_path})["help_link"]
 
     def get_subcategories(self, category_path):
-        category_path.replace(".", r"\.")
+        category_path = category_path.replace(".", r"\.")
         return self.db["categories"].find({"category_path": {"$regex": rf'{category_path}'}})
 
     def insert_subcategory_worker(self, category_path, user_id):
         self.db["categories"].update_one({"category_path": category_path}, {"$push": {"workers": user_id}})
 
     def update_subcategory_path(self, old_category_path, new_category_path):
-        old_category_path.replace(".", r"\.")
+        old_category_path = old_category_path.replace(".", r"\.")
         temp = self.db["categories"].find({"category_path": {"$regex": rf'{old_category_path}'}})
         path_list = [i["category_path"] for i in temp]
         requests = []
@@ -232,7 +236,7 @@ class Database:
         return to_return
 
     def delete_subcategory(self, category_path):
-        category_path.replace(".", r"\.")
+        category_path = category_path.replace(".", r"\.")
         temp = self.db["categories"].find({"category_path": {"$regex": rf'{category_path}'}})
         requests = []
         to_return = []
