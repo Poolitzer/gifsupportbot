@@ -129,10 +129,10 @@ def tree(update, _):
         update.effective_message.reply_text("You made a typo there, this category path does not exists")
         return
     generator = to_tree(dictionary)
-    update.effective_message.reply_text('\n'.join(generator))
+    update.effective_message.reply_text('\n'.join(generator), parse_mode="HTML")
 
 
 def to_tree(d, c=0):
     for a, b in d.items():
-        yield '   '.join('|' for _ in range(c + 1)) + f'---{a.replace("_", " ")}'
+        yield '   '.join('|' for _ in range(c + 1)) + f'---<code>{a.replace("_", " ")}</code>'
         yield from [] if b is None else to_tree(b, c + 1)

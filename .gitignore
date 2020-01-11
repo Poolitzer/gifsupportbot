@@ -10,3 +10,5 @@ venv
 pickle_file
 job_tuples.pickle
 log.log
+constants.py
+tokens.py
