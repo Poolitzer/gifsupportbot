@@ -4,7 +4,7 @@ from telegram.ext import (Updater, CallbackQueryHandler, ConversationHandler, Co
 from tokens import bottoken
 from general_handlers import general
 from conversation_handlers import (start_handler, add_gif_handler, edit_gif_handler, manage_gif_handler,
-                                   update_subcategory_handler, add_title_handler)
+                                   manage_categories_handler, update_subcategory_handler)
 from inline_handler.inline import inline
 from job_handlers import database_dump, online_ping, job_persistent
 from constants import ADMINS
@@ -12,7 +12,7 @@ from constants import ADMINS
 import datetime
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO, filename="log.log")
+                    level=logging.INFO)
 
 
 def main():
@@ -33,7 +33,6 @@ def main():
             add_gif_handler.DEVICE: [CallbackQueryHandler(add_gif_handler.device, pattern="user_devices"),
                                      CallbackQueryHandler(add_gif_handler.finish, pattern="finish")],
             add_gif_handler.GET_CATEGORY: [MessageHandler(Filters.text, add_gif_handler.add_category)],
-            add_gif_handler.GET_TITLE: [MessageHandler(Filters.text, add_gif_handler.add_title)],
             add_gif_handler.NEW_GIF: [MessageHandler(Filters.document, add_gif_handler.add_gif)]
         },
         fallbacks=[CommandHandler('cancel', add_gif_handler.cancel)], persistent=True, name="add_gif_handler")
@@ -84,10 +83,7 @@ def main():
         entry_points=[CommandHandler("manage", update_subcategory_handler.start)],
         states={
             update_subcategory_handler.CATEGORY: [MessageHandler(Filters.text, update_subcategory_handler.subcategory)],
-            update_subcategory_handler.SUBCATEGORY: [MessageHandler(Filters.text, update_subcategory_handler.what)],
-            update_subcategory_handler.WHAT: [MessageHandler(Filters.regex("Title"),
-                                                             update_subcategory_handler.update_title),
-                                              MessageHandler(Filters.regex("Description"),
+            update_subcategory_handler.WHAT: [MessageHandler(Filters.regex("Description"),
                                                              update_subcategory_handler.update_description),
                                               MessageHandler(Filters.regex("Help Link"),
                                                              update_subcategory_handler.update_link),
@@ -96,9 +92,6 @@ def main():
                                               MessageHandler(Filters.regex("GIF"),
                                                              update_subcategory_handler.update_gif)
                                               ],
-            # title
-            update_subcategory_handler.UPDATE_TITLE: [MessageHandler(Filters.text,
-                                                                     update_subcategory_handler.returned_title)],
             # description
             update_subcategory_handler.UPDATE_DESCRIPTION: [
                 MessageHandler(Filters.text, update_subcategory_handler.returned_description)],
@@ -132,16 +125,13 @@ def main():
         fallbacks=[CommandHandler('cancel', start_handler.cancel)], persistent=True, name="start_handler",
         allow_reentry=True)
     dp.add_handler(conversation_handler)
-    # add a new title
-    conv_add_handler = ConversationHandler(
-        entry_points=[CommandHandler("add_title", add_title_handler.start, filters=Filters.private)],
-        states={
-            add_title_handler.GET_CATEGORY: [MessageHandler(Filters.text, add_title_handler.add_category)],
-            add_title_handler.GET_TITLE: [MessageHandler(Filters.text, add_title_handler.add_title)]
-        },
-        fallbacks=[CommandHandler('cancel', add_gif_handler.cancel)], persistent=True, name="add_title_handler"
-    )
-    dp.add_handler(conv_add_handler)
+    # manage categories
+    dp.add_handler(CommandHandler("help_manage", manage_categories_handler.manage))
+    dp.add_handler(CommandHandler("mc", manage_categories_handler.new_category))
+    dp.add_handler(CommandHandler("rc", manage_categories_handler.rename_category))
+    dp.add_handler(CommandHandler("dc", manage_categories_handler.delete_category_question))
+    dp.add_handler(CommandHandler("yes", manage_categories_handler.delete_category))
+    dp.add_handler(CommandHandler("tree", manage_categories_handler.tree))
     # relatively smart general cancel handler
     dp.add_handler(CommandHandler("cancel", general.cancel))
     # help handler, displays a help message

@@ -3,22 +3,25 @@ from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton
 from database import database
 import utils
 from objects.gif import Gif
-from constants import RECORDED_CHANNEL_ID, DEVICES, CATEGORIES, BUMP_SECONDS
+from constants import RECORDED_CHANNEL_ID, DEVICES, BUMP_SECONDS
 from job_handlers.bump_timer import bump_recorded
 # states
-GIF_DEVICE, GET_CATEGORY, GET_TITLE, NEW_GIF, DEVICE = range(5)
+GIF_DEVICE, GET_CATEGORY, NEW_GIF, DEVICE = range(4)
 
 
 def add_command(update, _):
     user_id = update.effective_user.id
     if database.is_user_position(user_id, "recording"):
-        temp = []
-        for actual_device in database.get_user_devices(user_id):
-            temp.append(InlineKeyboardButton(actual_device, callback_data="record_device" + actual_device))
-        footer = [InlineKeyboardButton("Update Devices", callback_data="update_device")]
-        update.message.reply_text("You want to add a new GIF? Great. Choose one of your devices you recorded for.\n\n"
-                                  "Yours is not listed? Then hit the Update Devices button",
-                                  reply_markup=InlineKeyboardMarkup(utils.build_menu(temp, 2, footer_buttons=footer)))
+        pass
+    else:
+        return
+    temp = []
+    for actual_device in database.get_user_devices(user_id):
+        temp.append(InlineKeyboardButton(actual_device, callback_data="record_device" + actual_device))
+    footer = [InlineKeyboardButton("Update Devices", callback_data="update_device")]
+    update.message.reply_text("You want to add a new GIF? Great. Choose one of your devices you recorded for.\n\n"
+                              "Yours is not listed? Then hit the Update Devices button",
+                              reply_markup=InlineKeyboardMarkup(utils.build_menu(temp, 2, footer_buttons=footer)))
     return GIF_DEVICE
 
 
@@ -28,45 +31,44 @@ def add_device(update, context):
     real_device = query.data[13:]
     user_data["device"] = real_device
     buttons = []
-    for category in CATEGORIES:
+    for category in database.get_categories():
         buttons.append(KeyboardButton(category))
     query.answer()
     update.effective_message.reply_text("Great. Now, choose a category :)",
                                         reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
+    user_data["category_list"] = []
     return GET_CATEGORY
 
 
 def add_category(update, context):
     user_data = context.user_data
     category = update.effective_message.text
-    user_data["category"] = category
-    real_device = user_data["device"]
-    titles = database.get_subcategories_device_category(category, real_device)
-    if titles:
+    user_data["category_list"].append(category)
+    next_category = database.get_next_category(user_data["category_list"])
+    if next_category:
         buttons = []
-        for title in titles:
-            buttons.append(KeyboardButton(title))
-        update.effective_message.reply_text("Okay. Select a fitting subcategory now please.",
-                                            reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
-        return GET_TITLE
-    else:
-        buttons = []
-        for category in CATEGORIES:
+        for category in next_category:
             buttons.append(KeyboardButton(category))
-        message = "Sorry, no free subcategory left in this category for your device. Please contact the manager of " \
-                  "your choice in the GIF support group if you think that's a mistake, otherwise select another " \
-                  "category or hit /cancel"
-        update.effective_message.reply_text(message, reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
-        return GET_CATEGORY
-
-
-def add_title(update, context):
-    user_data = context.user_data
-    title = update.effective_message.text
-    user_data["title"] = title
-    update.effective_message.reply_text("Alright. Now, send me the GIF please. As a .mp4 file ;)",
-                                        reply_markup=ReplyKeyboardRemove())
-    return NEW_GIF
+        update.effective_message.reply_text("Alright. Select the next category pls",
+                                            reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
+    else:
+        real_device = user_data["device"]
+        user_data["category_path"] = ".".join(user_data["category_list"])
+        if database.get_subcategorie_device(user_data["category_path"], real_device):
+            update.effective_message.reply_text("Alright. Now, send me the GIF please. As a .mp4 file ;)",
+                                                reply_markup=ReplyKeyboardRemove())
+            del user_data["category_list"]
+            return NEW_GIF
+        else:
+            buttons = []
+            for category in database.get_categories():
+                buttons.append(KeyboardButton(category))
+            message = "Sorry, no free subcategory left in this category for your device. Please contact the manager " \
+                      "of your choice in the GIF support group if you think that's a mistake, otherwise select " \
+                      "another category or hit /cancel"
+            update.effective_message.reply_text(message, reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
+            user_data["category_list"] = []
+    return GET_CATEGORY
 
 
 def add_user_device(update, context):
@@ -123,8 +125,8 @@ def add_gif(update, context):
         return NEW_GIF
     update.message.reply_text("Nice, ty. Editors will be notified.")
     file_id = update.message.document.file_id
-    gif_id = database.insert_gif(Gif(file_id, user_data["device"], update.effective_user.id, user_data["category"],
-                                     user_data["title"]))
+    gif_id = database.insert_gif(Gif(file_id, user_data["device"], update.effective_user.id,
+                                     user_data["category_path"]))
     message = context.bot.send_document(RECORDED_CHANNEL_ID, file_id)
     message_id = message.message_id
     button = [[InlineKeyboardButton("I want to edit",
@@ -137,7 +139,10 @@ def add_gif(update, context):
     return -1
 
 
-def cancel(update, _):
+def cancel(update, context):
     update.message.reply_text("Cancelled the addition. Stupid human.")
+    user_data = context.user_data
+    if "category_list" in user_data:
+        del user_data["category_list"]
     # end conversation
     return -1

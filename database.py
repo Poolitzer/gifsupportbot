@@ -1,8 +1,11 @@
 import logging
-from constants import CATEGORIES
-from pymongo import MongoClient
+import re
+
+from pymongo import MongoClient, UpdateOne, DeleteOne
 from bson import ObjectId
 import json
+
+from betterdict.thesaurus import thes, Keypath
 
 
 class Database:
@@ -12,15 +15,71 @@ class Database:
         self.logger.debug("Database init")
         self.db = MongoClient()
         self.db = self.db["gifsupportbot"]
-        self.titles = json.load(open("./titles.json"))
+        self.categories = json.load(open("./categories.json"), object_hook=thes)
 
-    def save_titles(self):
-        with open("./titles.json", "w") as outfile:
-            json.dump(self.titles, outfile, indent=4, sort_keys=True)
+    def save_categories(self):
+        with open("./categories.json", "w") as outfile:
+            json.dump(self.categories, outfile, indent=4, sort_keys=True)
 
-    def add_title(self, category, title):
-        self.titles[category].append(title)
-        self.save_titles()
+    def add_category(self, path):
+        try:
+            self.categories.set_path(path, None)
+        except KeyError:
+            return False
+        self.save_categories()
+        return True
+
+    def rename_category(self, old_path, new_path):
+        old = Keypath(old_path)
+        new = Keypath(new_path)
+        # genius work by dave, https://t.me/PythonThesaurus/125
+        self.categories[new[:-1]][new[-1]] = self.categories[old[:-1]][old[-1]]
+        del self.categories[old[:-1]][old[-1]]
+        updated_categories = self.update_subcategory_path(old_path, new_path)
+        self.save_categories()
+        return updated_categories
+
+    def delete_category(self, path):
+        keypath = Keypath(path)
+        try:
+            # TODO get value from here
+            self.categories[keypath[:-1]][keypath[-1]]
+        except KeyError:
+            return "error"
+        del self.categories[keypath[:-1]][keypath[-1]]
+        pass_on = self.delete_subcategory(path)
+        # TODO
+        """
+        if value:
+            pass_on.append(str(value))
+        """
+        self.save_categories()
+        return pass_on
+
+    def get_categories(self):
+        return [i.replace("_", " ") for i in self.categories.keys()]
+
+    def get_next_category(self, category_path):
+        # thanks to https://stackoverflow.com/a/37704379 (ITS 10 AM OKAY. ME FEELING STUPID)
+        path = [i.replace(" ", "_") for i in category_path]
+        datadict = self.categories
+        for k in path:
+            datadict = datadict[k]
+        if datadict:
+            datadict = list(datadict.keys())
+        if datadict:
+            return [i.replace("_", " ") for i in datadict]
+        else:
+            return datadict
+
+    def get_category(self, category_path):
+        if category_path:
+            try:
+                return self.categories[category_path]
+            except KeyError:
+                return False
+        else:
+            return self.categories
 
     def insert_user(self, user):
         temp = self.db.users.find_one({"id": user.id})
@@ -104,113 +163,127 @@ class Database:
         gif_id = ObjectId(gif_id)
         return self.db.gifs.find_one({"_id": gif_id})["workers"][worker]
 
-    def get_subcategories_device_category(self, category, device):
-        to_return = []
-        for title in self.titles[category]:
-            if not self.db[category].find_one({"title": title, f"devices.{device}.file_id": {"$type": "string"}}):
-                to_return.append(title)
-        return to_return
+    def get_subcategorie_device(self, path, device):
+        if self.db["categories"].find_one({"path": path, f"devices.{device}.file_id": {"$type": "string"}}):
+            # subcategory already has a GIF for that device
+            return False
+        return True
 
-    def is_title_in_categories(self, category, title):
-        if self.db[category].find_one({"title": title}):
+    def is_gif_in_categories(self, category_path):
+        if self.db["categories"].find_one({"category_path": category_path}):
             return True
         else:
             return False
 
-    def get_subcategories_title(self, category):
-        to_return = []
-        for post in self.db[category].find():
-            to_return.append(post["title"])
-        return to_return
+    def insert_subcategory(self, subcategory):
+        return str(self.db["categories"].insert_one(vars(subcategory)).inserted_id)
 
-    def is_title_not_unique(self, category, title):
-        titles = self.titles[category]
-        for original_title in titles:
-            if title == original_title:
-                return True
-        return False
+    def insert_device(self, category_path, device, file_id, message_id):
+        self.db["categories"].update_one({"category_path": category_path},
+                                         {"$set": {f"devices.{device}.file_id": file_id,
+                                                   "devices.{device}.message_id": message_id}})
 
-    def insert_subcategory(self, category, subcategory):
-        return str(self.db[category].insert_one(vars(subcategory)).inserted_id)
+    def get_subcategory(self, category_path):
+        return self.db["categories"].find_one({"category_path": category_path})
 
-    def insert_device(self, category, title, device, file_id, message_id):
-        self.db[category].update_one({"title": title}, {"$set": {f"devices.{device}.file_id": file_id,
-                                                                 f"devices.{device}.message_id": message_id}})
+    def get_subcategory_keywords(self, category_path):
+        return self.db["categories"].find_one({"category_path": category_path})["keywords"]
 
-    def get_subcategory(self, category, title):
-        return self.db[category].find_one({"title": title})
-
-    def get_subcategory_keywords(self, category, title):
-        return self.db[category].find_one({"title": title})["keywords"]
-
-    def get_subcategory_devices(self, category, title):
-        devices = self.db[category].find_one({"title": title})["devices"]
+    def get_subcategory_devices(self, category_path):
+        devices = self.db["categories"].find_one({"category_path": category_path})["devices"]
         temp = {}
         for device in devices:
             if devices[device]["message_id"]:
                 temp[device] = devices[device]
         return temp
 
-    def get_subcategory_help_link(self, category, title):
-        return self.db[category].find_one({"title": title})["help_link"]
+    def get_subcategory_help_link(self, category_path):
+        return self.db["categories"].find_one({"category_path": category_path})["help_link"]
 
-    def get_subcategories(self, category):
-        return self.db[category].find()
+    def get_subcategories(self, category_path):
+        category_path.replace(".", r"\.")
+        return self.db["categories"].find({"category_path": {"$regex": rf'{category_path}'}})
 
-    def insert_subcategory_worker(self, category, title, user_id):
-        self.db[category].update_one({"title": title}, {"$push": {"workers": user_id}})
+    def insert_subcategory_worker(self, category_path, user_id):
+        self.db["categories"].update_one({"category_path": category_path}, {"$push": {"workers": user_id}})
 
-    def update_subcategory_title(self, category, old_title, new_title):
-        temp = self.db[category].find_one({"title": old_title})
-        self.db[category].update_one({"title": old_title}, {"$set": {"title": new_title}})
-        index_to_change = 0
-        for index, title in enumerate(self.titles[category]):
-            if title == old_title:
-                index_to_change = index
-                break
-        self.titles[category][index_to_change] = new_title
-        self.save_titles()
-        to_return = []
-        for device in temp["devices"]:
-            if temp["devices"][device]["message_id"]:
-                to_return.append({"device": device, "message_id": temp["devices"][device]["message_id"],
-                                  "help_link": temp["help_link"]})
+    def update_subcategory_path(self, old_category_path, new_category_path):
+        old_category_path.replace(".", r"\.")
+        temp = self.db["categories"].find({"category_path": {"$regex": rf'{old_category_path}'}})
+        path_list = [i["category_path"] for i in temp]
+        requests = []
+        to_return = {"changed_categories": len(path_list), "post": []}
+        for path in path_list:
+            new_path = re.sub(rf'{old_category_path}\.', f'{new_category_path}', path)
+            requests.append(UpdateOne(path, {"category_path": new_path}))
+            old_last = path.split(".")[-1]
+            new_last = new_path.split(".")[-1]
+            # that means title changed, we have to edit the channel
+            if old_last != new_last:
+                # I am not trusting that temp and path_list have the same index
+                wanted_category = self.db["categories"].find_one({"category_path": path})
+                for device in wanted_category["devices"]:
+                    # that means a channel post exists
+                    if wanted_category["devices"][device]["message_id"]:
+                        to_return["post"].append({"device": device, "help_link": wanted_category["help_link"],
+                                                  "message_id": wanted_category["devices"][device]["message_id"]})
+        if requests:
+            self.db["categories"].bulk_write(requests)
         return to_return
 
-    def update_subcategory_description(self, category, title, description):
-        temp = self.db[category].find_one({"title": title})
-        self.db[category].update_one({"title": title}, {"$set": {"description": description}})
+    def delete_subcategory(self, category_path):
+        category_path.replace(".", r"\.")
+        temp = self.db["categories"].find({"category_path": {"$regex": rf'{category_path}'}})
+        requests = []
+        to_return = []
+        for category in temp:
+            requests.append(DeleteOne(category["category_path"]))
+            for device in category["devices"]:
+                # that means a channel post exists
+                if category["devices"][device]["message_id"]:
+                    to_return.append({"message_id": category["devices"][device]["message_id"],
+                                      "gif_id": category["_id"]})
+        if requests:
+            self.db["category"].bulk_write(requests)
+        return to_return
+
+    def update_subcategory_description(self, category_path, description):
+        temp = self.db["categories"].find_one({"category_path": category_path})
+        self.db["categories"].update_one({"category_path": category_path}, {"$set": {"description": description}})
         return temp["description"]
 
-    def update_subcategory_link(self, category, title, help_link):
-        temp = self.db[category].find_one({"title": title})
+    def update_subcategory_link(self, category_path, help_link):
+        temp = self.db["categories"].find_one({"category_path": category_path})
         to_return = {"help_link": temp["help_link"], "messages": []}
-        self.db[category].update_one({"title": title}, {"$set": {"help_link": help_link}})
+        if help_link == "None":
+            help_link = None
+        self.db["categories"].update_one({"category_path": category_path}, {"$set": {"help_link": help_link}})
         for device in temp["devices"]:
             if temp["devices"][device]["message_id"]:
                 to_return["messages"].append({"device": device, "message_id": temp["devices"][device]["message_id"]})
         return to_return
 
-    def delete_subcategory_keyword(self, category, title, keyword):
-        self.db[category].update_one({"title": title}, {"$pull": {"keywords": keyword}})
+    def delete_subcategory_keyword(self, category_path, keyword):
+        self.db["categories"].update_one({"category_path": category_path}, {"$pull": {"keywords": keyword}})
 
-    def insert_subcategory_keyword(self, category, title, keyword):
-        self.db[category].update_one({"title": title}, {"$addToSet": {"keywords": keyword}})
+    def insert_subcategory_keyword(self, category_path, keyword):
+        self.db["categories"].update_one({"category_path": category_path}, {"$addToSet": {"keywords": keyword}})
 
-    def update_subcategory_gif(self, category, title, device, old_file_id, new_file_id):
+    def update_subcategory_gif(self, category_path, device, old_file_id, new_file_id):
         to_return = {"gif_id": "", "sub_id": "", "help_link": ""}
         gif_id = self.db.gifs.find_one({"edited_gif_id": old_file_id})['_id']
         to_return["gif_id"] = str(gif_id)
         self.db.gifs.update_one({"edited_gif_id": old_file_id}, {"$set": {"edited_gif_id": new_file_id}})
-        sub = self.db[category].find_one({"title": title})
+        sub = self.db["categories"].find_one({"category_path": category_path})
         to_return["sub_id"] = str(sub["_id"])
         to_return["help_link"] = sub["help_link"]
-        self.db[category].update_one({"title": title}, {"$set": {f"devices.{device}.file_id": new_file_id}})
+        self.db["categories"].update_one({"category_path": category_path},
+                                         {"$set": {f"devices.{device}.file_id": new_file_id}})
         return to_return
 
     def get_subcategories_device(self, device):
         to_return = []
-        for category in CATEGORIES:
+        for category in self.get_categories():
             subs = self.db[category].find({f"devices.{device}.file_id": {"$type": "string"}})
             for sub in subs:
                 to_return.append(sub)
@@ -218,7 +291,7 @@ class Database:
 
     def get_all_subcategories(self):
         to_return = []
-        for category in CATEGORIES:
+        for category in self.get_categories():
             subs = self.db[category].find()
             for sub in subs:
                 to_return.append(sub)

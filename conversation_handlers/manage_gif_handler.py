@@ -25,14 +25,14 @@ def manage_what(update, context):
     message_id = data[2]
     gif = database.get_gif(gif_id)
     context.user_data.update({"gif_id": gif_id, "message_id": message_id, "file_id": gif["edited_gif_id"],
-                              "device": gif["device"], "category": gif["category"], "title": gif["title"],
-                              "keywords": [], "help_link": "", "recorder": gif["recorded_gif_id"]})
-    context.bot.edit_message_caption(EDITED_CHANNEL_ID, message_id,
-                                     "Currently worked on by " + update.effective_user.first_name)
+                              "device": gif["device"], "path": gif["category_path"],
+                              "keywords": [], "help_link": "", "recorder": gif["workers"]["recorder"]})
+    context.bot.edit_message_caption(EDITED_CHANNEL_ID, message_id, caption="Currently worked on "
+                                                                            "by " + update.effective_user.first_name)
     buttons = [[InlineKeyboardButton("Yes", callback_data="is_edit_yes"),
                 InlineKeyboardButton("No", callback_data="is_edit_no")]]
-    caption = f"Is this GIF really good? Make sure it fits the category ({gif['category']}) and subcategory " \
-              f"({gif['title']}), as well as the device ({gif['device']})"
+    caption = f"Is this GIF really good? Make sure it fits the category path ({gif['category_path']}), as well as " \
+              f"the device ({gif['device']})"
     context.bot.send_document(user_id, gif["edited_gif_id"], caption=caption,
                               reply_markup=InlineKeyboardMarkup(buttons))
     for job in context.job_queue.get_jobs_by_name(gif_id):
@@ -44,17 +44,15 @@ def manage_what(update, context):
 def proceed(update, context):
     query = update.callback_query
     user_data = context.user_data
-    if database.is_title_in_categories(user_data["category"], user_data["title"]):
-        user_data["help_link"] = database.get_subcategory_help_link(user_data["category"], user_data["title"])
+    if database.is_gif_in_categories(user_data["path"]):
+        user_data["help_link"] = database.get_subcategory_help_link(user_data["path"])
         user_id = update.effective_user.id
         add_gif_to_sub(context, user_id, update.effective_user.first_name)
-        query.answer()
-        update.effective_message.reply_text("Alright, thanks for confirming.")
+        query.edit_message_caption("Alright, thanks for confirming.")
         # end conversation
         return -1
     else:
-        query.answer()
-        update.effective_message.reply_text("LETS DO THIS. Send me a description of this subcategory")
+        query.edit_message_caption("LETS DO THIS. Send me a description of this subcategory")
         return NEW_DESCRIPTION
 
 
@@ -67,14 +65,14 @@ def new_description(update, context):
 
 
 def add_url(update, context):
-    entities = update.message.parse_entities([MessageEntity.URL, MessageEntity.TEXT_LINK])
+    entities = update.effective_message.parse_entities([MessageEntity.URL, MessageEntity.TEXT_LINK])
     user_data = context.user_data
     user_data["help_link"] = ""
     for entity in entities:
-        if entity == MessageEntity.TEXT_LINK:
+        if entity == str:
+            user_data["help_link"] = entity
+        elif entity == MessageEntity.TEXT_LINK:
             user_data["help_link"] = entities[entity].url
-        elif entities[entity].type == MessageEntity.URL:
-            user_data["help_link"] = entities[entity]
         break
     if not user_data["help_link"]:
         update.message.reply_text("Hey man, your message markup must include a link. Try again or just press /skip "
@@ -118,14 +116,14 @@ def add_keyword(update, context):
 def finish_keywords(update, context):
     user_data = context.user_data
     user_id = update.effective_user.id
-    sub = Subcategory(user_data["title"], user_data["description"], user_data["keywords"], user_id,
+    sub = Subcategory(user_data["description"], user_data["keywords"], user_data["category_path"], user_id,
                       user_data["help_link"])
-    sub_id = database.insert_subcategory(user_data["category"], sub)
+    sub_id = database.insert_subcategory(sub)
     user_data["sub_id"] = sub_id
-    utils.log_action(context, update.effective_user.first_name, user_id, category=user_data["category"],
-                     subcategory_id=sub_id, created_sub=user_data)
     add_gif_to_sub(context, user_id, update.effective_user.first_name)
     update.message.reply_text("Done, thanks!")
+    utils.log_action(context, update.effective_user.first_name, user_id, category_path=user_data["category_path"],
+                     subcategory_id=sub_id, created_sub=user_data)
     # end conversation
     return -1
 
@@ -133,10 +131,10 @@ def finish_keywords(update, context):
 def add_gif_to_sub(context, user_id, first_name):
     user_data = context.user_data
     gif_id = user_data["gif_id"]
-    message_id = post_to_gif_channel(context.bot, user_data["title"], user_data["device"], user_data["help_link"],
+    title = user_data["category_path"].split(".")[-1]
+    message_id = post_to_gif_channel(context.bot, title, user_data["device"], user_data["help_link"],
                                      user_data["file_id"])
-    database.insert_device(user_data["category"], user_data["title"], user_data["device"], user_data["file_id"],
-                           message_id)
+    database.insert_device(user_data["category_path"], user_data["device"], user_data["file_id"], message_id)
     telegraph.update_page()
     context.bot.edit_message_caption(EDITED_CHANNEL_ID, user_data["message_id"], caption="Done by " + first_name)
     for message_id in database.get_gif_recorded_bumps(gif_id):
@@ -146,8 +144,8 @@ def add_gif_to_sub(context, user_id, first_name):
             context.bot.send_message(EDITED_CHANNEL_ID, DELETEBUMPS, reply_to_message_id=message_id)
             break
     database.insert_gif_manager(gif_id, user_id)
-    utils.log_action(context, first_name, user_id, category=user_data["category"], subcategory_id=user_data["sub_id"],
-                     file_id=user_data["file_id"], gif_to_sub=gif_id)
+    utils.log_action(context, first_name, user_id, category_path=user_data["category_path"],
+                     subcategory_id=user_data["sub_id"], file_id=user_data["file_id"], gif_to_sub=gif_id)
 
 
 def post_to_gif_channel(bot, title, device, help_link, file_id):
@@ -174,10 +172,8 @@ def edit_fix(update, _):
 
 
 # gif must be rerecorded
-def record_fix(update, context):
+def record_fix(update, _):
     query = update.callback_query
-    gif_id = context.user_data["gif_id"]
-    context.user_data["user_id"] = database.get_gif_worker(gif_id, "recorder")
     query.edit_message_caption("Yeah, lets just throw the GIF away. Send me a note now so I can message the recorder.")
     return NOTE_RECORD
 
@@ -210,7 +206,8 @@ def notify_editor(update, context):
         message_id = bump.message_id
         button = [[InlineKeyboardButton("I want to edit!", url=f"https://telegram.me/gifsupportbot?start=edit_"
                                                                f"{gif_id}_{message_id}")]]
-        context.bot.edit_message_reply_markup(RECORDED_CHANNEL_ID, message_id, reply_markup=button)
+        context.bot.edit_message_reply_markup(RECORDED_CHANNEL_ID, message_id,
+                                              reply_markup=InlineKeyboardMarkup(button))
         database.insert_gif_recorded_bump(gif_id, message_id)
     else:
         message = context.bot.send_document(chat_id=RECORDED_CHANNEL_ID, document=file_id, caption=note,
@@ -218,8 +215,10 @@ def notify_editor(update, context):
         message_id = message.message_id
         button = [[InlineKeyboardButton("I want to edit!", url=f"https://telegram.me/gifsupportbot?start=edit_"
                                                                f"{gif_id}_{message_id}")]]
-        context.bot.edit_message_reply_markup(RECORDED_CHANNEL_ID, message_id, reply_markup=button)
+        context.bot.edit_message_reply_markup(RECORDED_CHANNEL_ID, message_id,
+                                              reply_markup=InlineKeyboardMarkup(button))
     context.job_queue.run_repeating(bump_recorded, BUMP_SECONDS, name=gif_id, context=message.message_id)
+    utils.log_action(context, update.effective_user.first_name, user_id, returned_to_editor=gif_id)
     # end conversation
     return -1
 
@@ -252,6 +251,7 @@ def notify_recorder(update, context):
     else:
         context.bot.send_document(chat_id=int(recorder), document=file_id, caption=note, parse_mode=ParseMode.HTML)
     database.delete_gif(gif_id)
+    utils.log_action(context, update.effective_user.first_name, user_id, returned_to_recorder=gif_id)
     # end conversation
     return -1
 
@@ -271,9 +271,12 @@ def cancel(update, context):
     data = context.user_data
     button = [[InlineKeyboardButton("I want to manage!", url=f"https://telegram.me/gifsupportbot?start=manage_"
                                     f"{data['gif_id']}_{data['message_id']}")]]
-    context.bot.edit_message_caption(EDITED_CHANNEL_ID, data["message_id"], caption="",
-                                     reply_markup=InlineKeyboardMarkup(button))
-    context.job_queue.run_repeating(bump_edited, BUMP_SECONDS, name=data["gif_id"], context=data["message_id"])
+    try:
+        context.bot.edit_message_caption(EDITED_CHANNEL_ID, data["message_id"], caption="",
+                                         reply_markup=InlineKeyboardMarkup(button))
+        context.job_queue.run_repeating(bump_edited, BUMP_SECONDS, name=data["gif_id"], context=data["message_id"])
+    except BadRequest:
+        pass
     update.message.reply_text("Cancelled!", reply_markup=ReplyKeyboardRemove())
     # end conversation
     return -1

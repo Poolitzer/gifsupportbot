@@ -12,16 +12,14 @@ STATUS, EDITED, NOTE = range(3)
 def edit_what(update, context):
     data = context.args[0].split("_")
     user_id = update.effective_user.id
-    if database.is_user_position(user_id, "editing"):
-        pass
-    else:
+    if not database.is_user_position(user_id, "editing"):
         return
     context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
     gif_id = data[1]
     message_id = data[2]
     gif = database.get_gif(gif_id)
     context.user_data.update({"gif_id": gif_id, "message_id": message_id, "file_id": gif["recorded_gif_id"],
-                              "device": gif["device"], "category": gif["category"], "title": gif["title"],
+                              "device": gif["device"], "category_path": gif["category_path"],
                               "recorder": gif["workers"]["recorder"]})
     context.bot.edit_message_caption(RECORDED_CHANNEL_ID, message_id,
                                      caption=f"Currently worked on by {update.effective_user.first_name}")
@@ -47,7 +45,7 @@ def proceed(update, context):
     user_data = context.user_data
     text = "Have fun then. You have like what... 2 hours? Or so? Hurry up! And send me the edited recording as a GIF " \
            f"and not .mp4 or other formats or I will just ignore you.\nBtw, the used device is {user_data['device']}," \
-           f" the category {user_data['category']} and the subcategory {user_data['title']}\n\nIf you don't want to " \
+           f" the category path is the following: {user_data['category_path']}\n\nIf you don't want to " \
            f"edit and give the GIF back without the two hours wait time, send me /cancel."
     query.edit_message_caption(text)
     return EDITED
@@ -113,6 +111,7 @@ def notify_recorder(update, context):
     else:
         context.bot.send_document(chat_id=int(recoder), document=file_id, caption=note, parse_mode=ParseMode.HTML)
     database.delete_gif(gif_id)
+    log_action(context, update.effective_user.first_name, user_id, returned_to_recorder=gif_id)
     # end conversation
     return -1
 

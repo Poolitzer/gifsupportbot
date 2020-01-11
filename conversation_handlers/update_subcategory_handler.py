@@ -1,6 +1,6 @@
 from telegram import (KeyboardButton, ReplyKeyboardMarkup, ParseMode, ReplyKeyboardRemove, InlineKeyboardMarkup,
                       InlineKeyboardButton, InputMediaAnimation)
-from constants import CATEGORIES, POST_CHANNEL_ID, ARTICLE_URL, POST_CHANNEL_LINK
+from constants import POST_CHANNEL_ID, ARTICLE_URL, POST_CHANNEL_LINK
 import utils
 from telegraph_handler import telegraph
 from database import database
@@ -9,82 +9,59 @@ from telegram import ChatAction
 CATEGORY, SUBCATEGORY, WHAT, UPDATE_TITLE, UPDATE_DESCRIPTION, UPDATE_LINK, KEYWORD, DEVICE, GIF = range(9)
 
 
-def start(update, _):
+def start(update, context):
     user_id = update.effective_user.id
     if database.is_user_position(user_id, "managing"):
         buttons = []
-        for category in CATEGORIES:
+        for category in database.get_categories():
             buttons.append(KeyboardButton(category))
-        update.effective_message.reply_text("So you want to edit a subcategory? Well, lets start with the category.",
+        update.effective_message.reply_text("So you want to edit a subcategory? Well, pick your poison.",
                                             reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
+        context.user_data["category_list"] = []
         return CATEGORY
 
 
 def subcategory(update, context):
-    category = update.message.text
-    context.user_data["category"] = category
-    titles = database.get_subcategories_title(category)
-    buttons = []
-    if titles:
-        for title in titles:
-            buttons.append(KeyboardButton(title))
-        update.effective_message.reply_text("Great, now choose your subcategory",
+    user_data = context.user_data
+    category = update.effective_message.text
+    user_data["category_list"].append(category)
+    next_category = database.get_next_category(user_data["category_list"])
+    if next_category:
+        buttons = []
+        for category in next_category:
+            buttons.append(KeyboardButton(category))
+        update.effective_message.reply_text("Alright. Select the next category pls",
                                             reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
-        return SUBCATEGORY
     else:
-        update.effective_message.reply_text("Sorry, you choose a category where there aren't any subcategories yet. "
-                                            "Please select another one or hit /cancel")
-        return CATEGORY
-
-
-def what(update, context):
-    title = update.message.text
-    user_data = context.user_data
-    user_data["title"] = title
-    sub = database.get_subcategory(user_data["category"], title)
-    user_data["sub_id"] = sub["_id"]
-    buttons = [KeyboardButton("Title"), KeyboardButton("Description"), KeyboardButton("Help Link"),
-               KeyboardButton("Keywords"), KeyboardButton("GIF")]
-    if not sub['help_link']:
-        sub['help_link'] = "None"
-    # maybe we have to do more later if issues with the URL (id, anchor) appear
-    body = f"What do you want to update?\n\nCurrent status:\n<i>Title</i>: {sub['title']}\n<i>Description</i>: " \
-        f"{sub['description']}\n<i>Help Link</i>: {sub['help_link']}\n" \
-        f"<i>Keywords</i>: {', '.join(sub['keywords'])}\n\n" \
-        f"<a href=\"{ARTICLE_URL + '#' + title.replace(' ', '-')}\">Link to all the GIFs for this subcategory</a>"
-    update.message.reply_html(body, reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 2),
-                                                                     one_time_keyboard=True))
-    return WHAT
-
-
-# Title
-def update_title(update, _):
-    update.message.reply_text("Great. Tell me the new title please. And it still has to be unique,"
-                              "no escape from that.", reply_markup=ReplyKeyboardRemove())
-    return UPDATE_TITLE
-
-
-def returned_title(update, context):
-    title = update.message.text
-    user_data = context.user_data
-    if database.is_title_not_unique(user_data["category"], title):
-        update.message.reply_text("This title is already used, please select another one or hit /cancel.")
-        return UPDATE_TITLE
-    else:
-        to_edit = database.update_subcategory_title(user_data["category"], user_data["title"], title)
-        telegraph.update_page()
-        for message in to_edit:
-            context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
-            caption = utils.create_caption(title, message["device"], message["help_link"])
-            context.bot.edit_message_caption(POST_CHANNEL_ID, message["message_id"], caption=caption,
-                                             parse_mode=ParseMode.HTML)
-        update.message.reply_text("Updated Title!")
-        database.insert_subcategory_worker(user_data["category"], title, update.effective_user.id)
-        utils.log_action(context, update.effective_user.first_name, update.effective_user.id,
-                         category=user_data["category"], subcategory_id=user_data["sub_id"],
-                         titles={"old_title": user_data["title"], "new_title": title})
-        # end conversation
-        return -1
+        category_path = ".".join(user_data["category_list"])
+        if database.is_gif_in_categories(category_path):
+            sub = database.get_subcategory(category_path)
+            user_data.update({"sub_id": sub["_id"], "category_path": category_path})
+            buttons = [KeyboardButton("Description"), KeyboardButton("Help Link"),
+                       KeyboardButton("Keywords"), KeyboardButton("GIF")]
+            if not sub['help_link']:
+                sub['help_link'] = "None"
+            # maybe we have to do more later if issues with the URL (id, anchor) appear
+            # title is an old term but usable here
+            title = user_data["category_list"][-1]
+            body = f"What do you want to update?\n\nCurrent status:\n<i>Title</i>: {title}\n" \
+                   f"<i>Description</i>: {sub['description']}\n<i>Help Link</i>: {sub['help_link']}\n" \
+                   f"<i>Keywords</i>: {', '.join(sub['keywords'])}\n\n" \
+                   f"<a href=\"{ARTICLE_URL + '#' + title.replace(' ', '-')}\">Link to all the GIFs for this " \
+                   f"subcategory</a>. In case you want to change the \"title\", change the categories."
+            update.message.reply_html(body, reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 2),
+                                                                             one_time_keyboard=True))
+            del user_data["category_list"]
+            return WHAT
+        else:
+            buttons = []
+            for category in database.get_categories():
+                buttons.append(KeyboardButton(category))
+            message = "Sorry, there is no category created yet with that title. Either select another " \
+                      "category or hit /cancel."
+            update.effective_message.reply_text(message, reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
+            user_data["category_list"] = []
+    return CATEGORY
 
 
 # Description
@@ -96,11 +73,11 @@ def update_description(update, _):
 def returned_description(update, context):
     description = update.message.text
     user_data = context.user_data
-    old_description = database.update_subcategory_description(user_data["category"], user_data["title"], description)
+    old_description = database.update_subcategory_description(user_data["category_path"], description)
     update.message.reply_text("Updated Description!")
-    database.insert_subcategory_worker(user_data["category"], user_data["title"], update.effective_user.id)
+    database.insert_subcategory_worker(user_data["category_path"], update.effective_user.id)
     utils.log_action(context, update.effective_user.first_name, update.effective_user.id,
-                     category=user_data["category"], subcategory_id=user_data["sub_id"],
+                     category_path=user_data["category_path"], subcategory_id=user_data["sub_id"],
                      description={"old_description": old_description, "new_description": description})
     # end conversation
     return -1
@@ -127,7 +104,7 @@ def returned_link(update, context):
     if not new_link.startswith("http://"):
         if not new_link.startswith("https://"):
             new_link = "http://" + new_link
-    returned = database.update_subcategory_link(user_data["category"], user_data["title"], new_link)
+    returned = database.update_subcategory_link(user_data["category_path"], new_link)
     if returned["help_link"] != new_link:
         for message in returned["messages"]:
             context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
@@ -135,9 +112,9 @@ def returned_link(update, context):
             context.bot.edit_message_caption(POST_CHANNEL_ID, message["message_id"], caption=caption,
                                              parse_mode=ParseMode.HTML, timeout=100)
     update.message.reply_text("Updated the help link!")
-    database.insert_subcategory_worker(user_data["category"], user_data["title"], update.effective_user.id)
+    database.insert_subcategory_worker(user_data["category_path"], update.effective_user.id)
     utils.log_action(context, update.effective_user.first_name, update.effective_user.id,
-                     category=user_data["category"], subcategory_id=user_data["sub_id"],
+                     category_path=user_data["category_path"], subcategory_id=user_data["sub_id"],
                      links={"old_link": returned["help_link"], "new_link": new_link})
     # end conversation
     return -1
@@ -145,7 +122,7 @@ def returned_link(update, context):
 
 def returned_link_none(update, context):
     user_data = context.user_data
-    returned = database.update_subcategory_link(user_data["category"], user_data["title"], "")
+    returned = database.update_subcategory_link(user_data["category_path"], "")
     if returned["help_link"] != "":
         for message in returned["messages"]:
             context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
@@ -153,9 +130,9 @@ def returned_link_none(update, context):
             context.bot.edit_message_caption(POST_CHANNEL_ID, message["message_id"], caption=caption,
                                              parse_mode=ParseMode.HTML)
     update.message.reply_text("Updated the help link!")
-    database.insert_subcategory_worker(user_data["category"], user_data["title"], update.effective_user.id)
+    database.insert_subcategory_worker(user_data["category_path"], update.effective_user.id)
     utils.log_action(context, update.effective_user.first_name, update.effective_user.id,
-                     category=user_data["category"], subcategory_id=user_data["sub_id"],
+                     category_path=user_data["category_path"], subcategory_id=user_data["sub_id"],
                      links={"old_link": returned["help_link"], "new_link": "None"})
     # end conversation
     return -1
@@ -164,7 +141,7 @@ def returned_link_none(update, context):
 # keywords
 def update_keywords(update, context):
     user_data = context.user_data
-    keywords = database.get_subcategory_keywords(user_data["category"], user_data["title"])
+    keywords = database.get_subcategory_keywords(user_data["category_path"])
     user_data["keywords"] = keywords
     buttons = []
     for index, keyword in enumerate(keywords):
@@ -181,11 +158,12 @@ def returned_keyword(update, context):
     data = query.data[7:]
     keyword = user_data["keywords"][int(data)]
     query.answer()
-    database.delete_subcategory_keyword(user_data["category"], user_data["title"], keyword)
+    database.delete_subcategory_keyword(user_data["category_path"], keyword)
     update.effective_message.reply_text("Keyword successfully deleted!", reply_markup=ReplyKeyboardRemove())
-    database.insert_subcategory_worker(user_data["category"], user_data["title"], update.effective_user.id)
+    database.insert_subcategory_worker(user_data["category_path"], update.effective_user.id)
     utils.log_action(context, update.effective_user.first_name, update.effective_user.id,
-                     category=user_data["category"], subcategory_id=user_data["sub_id"], deleted_keyword=keyword)
+                     category_path=user_data["category_path"], subcategory_id=user_data["sub_id"],
+                     deleted_keyword=keyword)
     # end conversation
     return -1
 
@@ -193,11 +171,11 @@ def returned_keyword(update, context):
 def new_keyword(update, context):
     user_data = context.user_data
     keyword = update.message.text
-    database.insert_subcategory_keyword(user_data["category"], user_data["title"], keyword)
+    database.insert_subcategory_keyword(user_data["category_path"], keyword)
     update.message.reply_text("Keyword successfully added!", reply_markup=ReplyKeyboardRemove())
-    database.insert_subcategory_worker(user_data["category"], user_data["title"], update.effective_user.id)
+    database.insert_subcategory_worker(user_data["category_path"], update.effective_user.id)
     utils.log_action(context, update.effective_user.first_name, update.effective_user.id,
-                     category=user_data["category"], subcategory_id=user_data["sub_id"], new_keyword=keyword)
+                     category_path=user_data["category_path"], subcategory_id=user_data["sub_id"], new_keyword=keyword)
     # end conversation
     return -1
 
@@ -205,7 +183,7 @@ def new_keyword(update, context):
 # change gif
 def update_gif(update, context):
     user_data = context.user_data
-    devices = database.get_subcategory_devices(user_data["category"], user_data["title"])
+    devices = database.get_subcategory_devices(user_data["category_path"])
     user_data["devices"] = devices
     buttons = []
     links = ""
@@ -230,21 +208,26 @@ def returned_device(update, context):
 def returned_gif(update, context):
     user_data = context.user_data
     new_file_id = update.message.document.file_id
-    stuff = database.update_subcategory_gif(user_data["category"], user_data["title"], user_data["device"]["name"],
+    stuff = database.update_subcategory_gif(user_data["category_path"], user_data["device"]["name"],
                                             user_data["device"]["file_id"], new_file_id)
-    caption = utils.create_caption(user_data["title"], user_data["device"]["name"], stuff["help_link"])
+    title = user_data["category_path"].split(".")[-1]
+    caption = utils.create_caption(title, user_data["device"]["name"], stuff["help_link"])
     context.bot.edit_message_media(chat_id=POST_CHANNEL_ID, message_id=user_data["device"]["message_id"],
                                    media=InputMediaAnimation(media=new_file_id, caption=caption))
     telegraph.update_page()
     update.message.reply_text("Edited GIF!", reply_markup=ReplyKeyboardRemove())
-    database.insert_subcategory_worker(user_data["category"], user_data["title"], update.effective_user.id)
+    database.insert_subcategory_worker(user_data["category_path"], update.effective_user.id)
     utils.log_action(context, update.effective_user.first_name, update.effective_user.id, file_id=new_file_id,
-                     category=user_data["category"], subcategory_id=stuff["sub_id"], edit_sub_gif=stuff["gif_id"])
+                     category_path=user_data["category_path"], subcategory_id=stuff["sub_id"],
+                     edit_sub_gif=stuff["gif_id"])
     # end conversation
     return -1
 
 
-def cancel(update, _):
+def cancel(update, context):
     update.message.reply_text("Cancelled!", reply_markup=ReplyKeyboardRemove())
+    user_data = context.user_data
+    if "category_list" in user_data:
+        del user_data["category_list"]
     # end conversation
     return -1

@@ -7,3 +7,6 @@ may show some fellow developers what you can do with a telegram bot. Open Source
 You need to install the [python-telegram-bot library](https://python-telegram-bot.org/), the 
 [pymongo library](https://api.mongodb.com/python/current/) and [requests](https://2.python-requests.org/en/master/). 
 That's it.
+
+A big thanks to a lot of people is due at this point. I'd really like to thank Dave, the creator of 
+[Thesaurus](https://git.cinege.com/thesaurus/). Without his work, a fair amount of this project would have been significantly harder to implement. Also a big thanks to [Linus]("https://t.me/Linus), who helped discovering endless bugs.

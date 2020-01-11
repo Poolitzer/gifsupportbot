@@ -15,8 +15,8 @@ def update_page():
     time = datetime.now().strftime("%d/%m/%y")
     ARTICLE_APPEND[2]["children"][0] = ARTICLE_APPEND[2]["children"][0].format(time)
     content = ARTICLE_PREPEND + menu + main_content + menu + ARTICLE_APPEND
-    stuff = {"access_token": telegraphtoken, "title": "Test", "content": json.dumps(content)}
-    request = r.post("https://api.telegra.ph/editPage/test-05-27-72", data=stuff)
+    stuff = {"access_token": telegraphtoken, "title": "Beta Gif Support Article", "content": json.dumps(content)}
+    request = r.post("https://api.telegra.ph/editPage/test-01-10-115", data=stuff)
     if request.status_code == 200:
         if request.json()["ok"]:
             pass

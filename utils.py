@@ -12,10 +12,11 @@ def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
     return menu
 
 
-def log_action(context, first_name, user_id, recorded_gif_id="", edited_gif_id="", file_id="", category="",
-               subcategory_id="", created_sub=None, gif_to_sub=None, titles=None, description=None, links=None,
+def log_action(context, first_name, user_id, recorded_gif_id="", edited_gif_id="", file_id="", category_path="",
+               subcategory_id="", created_sub=None, gif_to_sub=None, description=None, links=None,
                deleted_keyword="", new_keyword="", edit_sub_gif=None, new_person=None, new_position=None,
-               removed_person=None, title=""):
+               removed_person=None, returned_to_recorder=None, returned_to_editor=None, new_category=None,
+               rename_category=None, delete_category=None):
     body = f"{mention_html(int(user_id), first_name)} (#tq{user_id}) "
     if recorded_gif_id:
         body += f"<b>added a GIF.</b>\n\nId: #{recorded_gif_id}"
@@ -24,14 +25,13 @@ def log_action(context, first_name, user_id, recorded_gif_id="", edited_gif_id="
     elif created_sub:
         if not created_sub['help_link']:
             created_sub['help_link'] = "None"
-        body += f"<b>created a subcategory.</b>\n\n<i>Category:</i> {category}\n<i>Title:</i> {created_sub['title']}\n"\
-            f"<i>Description:</i> {created_sub['description']}\n<i>Help Link:</i> {created_sub['help_link']}\n" \
-            f"<i>Keywords:</i> {', '.join(created_sub['keywords'])}\n\nSub Id: #{subcategory_id}"
+        body += f"<b>created a subcategory.</b>\n\n<i>Category:</i> {category_path}\n<i>Title:</i> " \
+                f"{category_path.split('.')[-1]}\n<i>Description:</i> {created_sub['description']}\n<" \
+                f"i>Help Link:</i> {created_sub['help_link']}\n<i>Keywords:</i> {', '.join(created_sub['keywords'])}" \
+                f"\n\nSub Id: #{subcategory_id}"
     # this works because I dont pass it in the creation of a sub.
     elif gif_to_sub:
         body += f"<b>added a GIF to a subcategory.</b>\n\nGIF Id: #{gif_to_sub}"
-    elif titles:
-        body += f"<b>changed the title</b> from <i>{titles['old_title']}</i> to <i>{titles['new_title']}</i>."
     elif description:
         body += f"<b>changed the description</b> from <i>{description['old_description']}</i> to " \
             f"<i>{description['new_description']}</i>."
@@ -54,10 +54,21 @@ def log_action(context, first_name, user_id, recorded_gif_id="", edited_gif_id="
         body += f"<b>got himself the following position(s):</b> {', '.join(new_position)}"
     elif removed_person:
         body += f"<b>is removed from the project</b>"
-    elif title:
-        body += f"<b>added the title {title}.</b>"
-    if not created_sub and category:
-        body += f"\n\nCategory: <i>{category}</i>\nId: #{subcategory_id}"
+    elif returned_to_recorder:
+        body += f"<b>returned a GIF to the recorders (last time you see this ID).</b>" \
+                f"\n\nGIF Id: #{returned_to_recorder}."
+    elif returned_to_editor:
+        body += f"<b>returned a GIF to the editors.</b>\n\nGIF Id: #{returned_to_editor}."
+    elif new_category:
+        body += f"<b>created a category.</b> Category path: <i>{new_category}</i>"
+    elif rename_category:
+        body += f"<b>renamed a category.</b> Category path: <i>{rename_category[0]}</i> > <i>{rename_category[1]}</i>" \
+                f". {rename_category[2]} categories have been changed"
+    elif delete_category:
+        body += f"<b>deleted a category.</b> Category path: <i>{delete_category['path']}</i>. This means these GIFs " \
+                f"are now gone: {', '.join(delete_category['categories'])}"
+    if not created_sub and category_path:
+        body += f"\n\nCategory path: <i>{category_path}</i>\nId: #{subcategory_id}"
     if file_id:
         context.bot.send_document(LOG_CHANNEL_ID, file_id, caption=body, disable_notification=True,
                                   parse_mode=ParseMode.HTML)

@@ -1,11 +1,10 @@
-from constants import CATEGORIES
 from database import database
 from constants import DEVICES, POST_CHANNEL_LINK
 
 
 def menu_generator():
     content = {'tag': 'blockquote', 'children': []}
-    for category in CATEGORIES:
+    for category in database.get_categories():
         # maybe we have to do more later when issues with the URL appear
         link = category.replace(" ", "-")
         temp = {'tag': 'a', 'attrs': {'href': f'#{link}'}, 'children': [category]}
@@ -18,13 +17,14 @@ def menu_generator():
 
 def main_content_generator():
     temp = []
-    for category in CATEGORIES:
+    for category in database.get_categories():
         # maybe we have to do more later when issues with the URL appear
         link = category.replace(" ", "-")
         header = {'tag': 'h3', 'children': [{'tag': 'a', 'attrs': {'href': f'#{link}'}, 'children': [category]}]}
         temp.append(header)
         for sub in database.get_subcategories(category):
-            sub_header = {'tag': 'h4', 'children': [sub["title"]]}
+            title = sub["category_path"].split(".")[-1]
+            sub_header = {'tag': 'h4', 'children': [title]}
             temp.append(sub_header)
             devices = {"mobile": [], "desktop": []}
             x = 0
