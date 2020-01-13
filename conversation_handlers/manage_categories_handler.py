@@ -17,9 +17,10 @@ def manage(update, _):
               "automatically created. Also note that underlines are not supported, they will be turned to spaces</i>" \
               "\n\n<b>Syntax:</b>\n/mc [category path]\n<b>Example:</b>\n<code>/mc settings.chat settings.themese" \
               "</code>\n\n" \
-              "• <b>Move/Rename category</b>\n<i>Note: The new path needs to exists until the last category, which " \
-              "needs to be a new one.</i>\n\n<b>Syntax:</b>\n/rc [old path]>[new path]\n<b>" \
-              "Example:</b>\n<code>/rc settings.chat settings.themese>settings.chat settings.themes</code>\n\n" \
+              "• <b>Move/Rename category</b>\n<i>Note: You can not create multiple new categories using this " \
+              "command. You must use /mc first if the path you are trying to move the gifs to does not exist.</i>" \
+              "\n\n<b>Syntax:</b>\n/rc [old path]>[new path]\n<b>Example:</b>\n<code>/rc settings.chat " \
+              "settings.themese>settings.chat settings.themes</code>\n\n" \
               "• <b>Delete category</b>\n<i>Note: When you use this command, this means every gif within the " \
               "selected category gets deleted. When you provide a parent category, it and every sub category gets " \
               "deleted, potentially a lot of GIFs. Be very very careful about what you are doing here, otherwise " \

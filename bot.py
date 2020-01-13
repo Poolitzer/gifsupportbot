@@ -12,7 +12,7 @@ from constants import ADMINS
 import datetime
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
+                    level=logging.INFO, filename="log.log")
 
 
 def main():
@@ -127,11 +127,11 @@ def main():
     dp.add_handler(conversation_handler)
     # manage categories
     dp.add_handler(CommandHandler("help_manage", manage_categories_handler.manage))
-    dp.add_handler(CommandHandler("mc", manage_categories_handler.new_category))
-    dp.add_handler(CommandHandler("rc", manage_categories_handler.rename_category))
-    dp.add_handler(CommandHandler("dc", manage_categories_handler.delete_category_question))
-    dp.add_handler(CommandHandler("yes", manage_categories_handler.delete_category))
-    dp.add_handler(CommandHandler("tree", manage_categories_handler.tree))
+    dp.add_handler(CommandHandler("mc", manage_categories_handler.new_category, filters=Filters.private))
+    dp.add_handler(CommandHandler("rc", manage_categories_handler.rename_category, filters=Filters.private))
+    dp.add_handler(CommandHandler("dc", manage_categories_handler.delete_category_question, filters=Filters.private))
+    dp.add_handler(CommandHandler("yes", manage_categories_handler.delete_category, filters=Filters.private))
+    dp.add_handler(CommandHandler("tree", manage_categories_handler.tree, filters=Filters.private))
     # relatively smart general cancel handler
     dp.add_handler(CommandHandler("cancel", general.cancel))
     # help handler, displays a help message

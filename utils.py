@@ -60,15 +60,15 @@ def log_action(context, first_name, user_id, recorded_gif_id="", edited_gif_id="
     elif returned_to_editor:
         body += f"<b>returned a GIF to the editors.</b>\n\nGIF Id: #{returned_to_editor}."
     elif new_category:
-        body += f"<b>created a category.</b> Category path: <i>{new_category}</i>"
+        body += f"<b>created a category.</b> Category path: <code>{new_category}</code>"
     elif rename_category:
-        body += f"<b>renamed a category.</b> Category path: <i>{rename_category[0]}</i> > <i>{rename_category[1]}</i>" \
-                f". {rename_category[2]} categories have been changed"
+        body += f"<b>renamed a category.</b> Category path: <code>{rename_category[0]}</code> " \
+                f"<code>{rename_category[1]}</code>. {rename_category[2]} categories have been changed"
     elif delete_category:
-        body += f"<b>deleted a category.</b> Category path: <i>{delete_category['path']}</i>. This means these GIFs " \
-                f"are now gone: {', '.join(delete_category['categories'])}"
+        body += f"<b>deleted a category.</b> Category path: <code>{delete_category['path']}</code>. This means these " \
+                f"GIFs are now gone: {', '.join(delete_category['categories'])}"
     if not created_sub and category_path:
-        body += f"\n\nCategory path: <i>{category_path}</i>\nId: #{subcategory_id}"
+        body += f"\n\nCategory path: <code>{category_path}</code>\nId: #{subcategory_id}"
     if file_id:
         context.bot.send_document(LOG_CHANNEL_ID, file_id, caption=body, disable_notification=True,
                                   parse_mode=ParseMode.HTML)
