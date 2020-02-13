@@ -136,6 +136,8 @@ def helping(update, _):
 
 
 def error(update, context):
+    if not update:
+        context.bot.send_message(208589966, "Error without update happend check log")
     if update.effective_message:
         text = "Hey. So there happened an error while executing your command. I alerted @poolitzer already, " \
                "if you think you can help fixing this problem, just contact him. Otherwise, if he needs help, " \

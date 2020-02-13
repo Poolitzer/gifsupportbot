@@ -23,7 +23,7 @@ class Database:
 
     def add_category(self, path):
         try:
-            self.categories.set_path(path, None)
+            self.categories.set_path(path, thes())
         except KeyError:
             return False
         self.save_categories()

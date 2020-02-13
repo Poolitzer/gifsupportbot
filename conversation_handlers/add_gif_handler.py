@@ -43,14 +43,18 @@ def add_device(update, context):
 def add_category(update, context):
     user_data = context.user_data
     category = update.effective_message.text
-    user_data["category_list"].append(category)
-    next_category = database.get_next_category(user_data["category_list"])
+    if category != "Done":
+        user_data["category_list"].append(category)
+        next_category = database.get_next_category(user_data["category_list"])
+    else:
+        next_category = False
     if next_category:
         buttons = []
         for category in next_category:
             buttons.append(KeyboardButton(category))
+        footer = [KeyboardButton("Done")]
         update.effective_message.reply_text("Alright. Select the next category pls",
-                                            reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3)))
+                                            reply_markup=ReplyKeyboardMarkup(utils.build_menu(buttons, 3, footer_buttons=footer)))
     else:
         real_device = user_data["device"]
         user_data["category_path"] = ".".join(user_data["category_list"])
